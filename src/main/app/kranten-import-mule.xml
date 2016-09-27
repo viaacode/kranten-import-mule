@@ -14,6 +14,6 @@
 	">
 
 	<db:generic-config name="tracking-db" url="${database.url}" driverClassName="org.postgresql.Driver" doc:name="track database configuration" />
-	<amqp:connector name="broker_connector" validateConnections="true" doc:name="AMQP-0-9 Connector" host="docker" />
+	<amqp:connector name="broker_connector" validateConnections="true" doc:name="AMQP-0-9 Connector" host="192.168.99.100" />
 
 </mule>
