@@ -1,22 +1,23 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<mule xmlns:json="http://www.mulesoft.org/schema/mule/json"
+<mule
 	xmlns="http://www.mulesoft.org/schema/mule/core"
 	xmlns:amqp="http://www.mulesoft.org/schema/mule/amqp"
-	xmlns:amqps="http://www.mulesoft.org/schema/mule/amqps"
 	xmlns:db="http://www.mulesoft.org/schema/mule/db"
 	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
 	xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:json="http://www.mulesoft.org/schema/mule/json"
 	xmlns:scripting="http://www.mulesoft.org/schema/mule/scripting"
 	xmlns:spring="http://www.springframework.org/schema/beans"
 	xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking"
 	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 	xsi:schemaLocation="
 		http://www.mulesoft.org/schema/mule/amqp http://www.mulesoft.org/schema/mule/amqp/current/mule-amqp.xsd
-		http://www.mulesoft.org/schema/mule/amqps http://www.mulesoft.org/schema/mule/amqps/current/mule-amqps.xsd
 		http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
 		http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
 		http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
 		http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+		http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
 		http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
 		http://www.mulesoft.org/schema/mule/scripting http://www.mulesoft.org/schema/mule/scripting/current/mule-scripting.xsd
 		http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
@@ -26,11 +27,9 @@
 		<amqp:inbound-endpoint queueName="${broker.queues.trigger}" responseTimeout="10000" doc:name="start-complex-generation" connector-ref="broker_connector"/>
 		<object-to-string-transformer doc:name="Object to String"/>
 		<set-variable variableName="json" value="#[payload]" doc:name="keep json"/>
-		<logger message="#[&quot;-----------------\n&quot; + payload + &quot;\n------\n&quot;]" level="INFO" doc:name="Logger"/>
 		<json:json-to-object-transformer returnClass="java.util.HashMap" doc:name="JSON to Object"/>
-		<set-variable variableName="pid" value="#[payload.pid]" doc:name="set pid"/>
+		<set-variable variableName="pid" value="#[payload['pid']]" doc:name="set pid"/>
 		<set-variable variableName="request" value="#[payload]" doc:name="keep request"/>
-		<logger message="pid is: #[flowVars.pid] (#[payload.pid]), payload is: #[payload]" level="INFO" doc:name="Logger"/>
 		<db:insert config-ref="tracking-db" doc:name="Database">
 			<db:parameterized-query><![CDATA[insert into ${database.tracktable} (pid, status, data)
 values (#[flowVars.pid], 'initialized', #[flowVars.json]);]]></db:parameterized-query>
@@ -40,75 +39,94 @@ values (#[flowVars.pid], 'initialized', #[flowVars.json]);]]></db:parameterized-
 %output application/json
 ---
 {
-	"pid": flowVars.pid,
-	"directory": flowVars.request.directory
+	'pid': flowVars.pid,
+	'directory': flowVars.request.directory,
+	'excludes': ['_complex']
 }]]></dw:set-payload>
 		</dw:transform-message>
-		<amqp:outbound-endpoint exchangeName="${broker.exchanges.list_directory}" responseTimeout="10000" exchange-pattern="request-response" doc:name="request directory listing"/>
+		<amqp:outbound-endpoint exchangeName="${broker.exchanges.list_directory}" responseTimeout="10000"  doc:name="request directory listing"/>
 		<db:update config-ref="tracking-db" doc:name="Database">
-			<db:parameterized-query><![CDATA[update ${database.tracktable} 
+			<db:parameterized-query><![CDATA[update ${database.tracktable}
 set status = 'requested-directory-listing'
+where pid = #[flowVars.pid];]]></db:parameterized-query>
+		</db:update>
+		<catch-exception-strategy doc:name="Catch Exception Strategy">
+			<amqp:reject-message doc:name="AMQP-0-9 Reject Message"/>
+		</catch-exception-strategy>
+	</flow>
+
+	<flow name="restart-failed-generation">
+		<amqp:inbound-endpoint queueName="${broker.queues.recover}" responseTimeout="10000" doc:name="restart-failed-generation" connector-ref="broker_connector"/>
+		<json:json-to-object-transformer returnClass="java.util.HashMap" doc:name="JSON to Object"/>
+		<set-variable variableName="pid" value="#[payload['pid']]" doc:name="keep pid"/>
+		<set-variable variableName="data" value="#[payload]" doc:name="keep payload data"/>
+		<flow-ref name="check-known-pid" doc:name="check-known-pid"/>
+		<set-variable variableName="request" value="#[payload]" doc:name="keep pid related data"/>
+		<db:update config-ref="tracking-db" doc:name="Database">
+			<db:parameterized-query><![CDATA[update ${database.tracktable}
+set status = 'restarting', nr_of_moves = 0, nr_of_moved = 0
+where pid = #[flowVars.pid];]]></db:parameterized-query>
+		</db:update>
+		<dw:transform-message doc:name="Transform Message">
+			<dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+	'correlation_id': flowVars.pid,
+	'directory': flowVars.request.directory ++ '/' ++ p ('private_dir')
+}]]></dw:set-payload>
+		</dw:transform-message>
+		<amqp:outbound-endpoint exchangeName="${broker.exchanges.rm_private_dir}" responseTimeout="10000" doc:name="request removing private dir" connector-ref="broker_connector"/>
+		<db:update config-ref="tracking-db" doc:name="Database">
+			<db:parameterized-query><![CDATA[update ${database.tracktable}
+set status = 'restarting-generation'
 where pid = #[flowVars.pid];]]></db:parameterized-query>
 		</db:update>
 	</flow>
 
-	<flow name="restart-failed-generation">
-		<amqp:inbound-endpoint queueName="${broker.queues.recover}" responseTimeout="10000" doc:name="restart-failed-generation"/>
+	<flow name="queue-listenersFlow">
+		<amqp:inbound-endpoint responseTimeout="10000" doc:name="continue-restart-after-cleared" connector-ref="broker_connector" queueName="${broker.queues.continuerecover}"/>
+		<json:json-to-object-transformer returnClass="java.util.HashMap" doc:name="JSON to Object"/>
+		<set-variable variableName="pid" value="#[payload['correlation_id']]" doc:name="keep pid"/>
+		<set-variable variableName="data" value="#[payload]" doc:name="keep payload data"/>
 		<flow-ref name="check-known-pid" doc:name="check-known-pid"/>
-		<db:update config-ref="tracking-db" doc:name="Database">
-			<db:parameterized-query><![CDATA[update ${database.tracktable}
-set `status` = 'restarting'
-where `pid` = #[payload.pid];]]></db:parameterized-query>
-		</db:update>
-		<amqp:outbound-endpoint responseTimeout="10000" exchange-pattern="request-response" doc:name="request directory listing" exchangeName="${broker.exchanges.list_directory}"/>
-		<db:update config-ref="tracking-db" doc:name="Database">
-			<db:parameterized-query><![CDATA[update ${database.tracktabe}
-set `status` = 'requested-directory-listing'
-where `pid` = #[payload.pid];]]></db:parameterized-query>
-		</db:update>
+		<set-variable variableName="request" value="#[payload]" doc:name="keep pid related data"/>
+		<dw:transform-message doc:name="Transform Message">
+			<dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+	'pid': flowVars.pid,
+	'directory': flowVars.request.directory,
+	'excludes': ['_complex']
+}]]></dw:set-payload>
+		</dw:transform-message>
+		<amqp:outbound-endpoint responseTimeout="10000" doc:name="AMQP-0-9" connector-ref="broker_connector" exchangeName="${broker.exchanges.list_directory}"/>
 	</flow>
 
 	<flow name="list-directories-completed">
 		<amqp:inbound-endpoint queueName="${broker.queues.directorylist}" responseTimeout="10000" doc:name="list-directories-completed"/>
 		<json:json-to-object-transformer returnClass="java.util.HashMap" doc:name="JSON to Object"/>
-		<set-variable variableName="pid" value="#[payload.pid]" doc:name="keep pid"/>
+		<set-variable variableName="pid" value="#[payload['pid']]" doc:name="keep pid"/>
 		<set-variable variableName="data" value="#[payload]" doc:name="keep payload data"/>
 		<flow-ref name="check-known-pid" doc:name="check-known-pid"/>
 		<set-variable variableName="request" value="#[payload]" doc:name="keep pid related data"/>
-		<logger message="LISTING IS: #[flowVars.data]" level="INFO" doc:name="Logger"/>
 		<dw:transform-message doc:name="calculate renames">
-			<dw:set-variable variableName="data"><![CDATA[%dw 1.0
-%output application/java
-%var getPageNumber = (path) -> (path match  /.*[^0-9](\d+).*/)[1]
----
-{
-	"tiffs": flowVars.data.files filter ($ contains 'tif') map ({
-		'correlation_id': flowVars.pid,
-		'destination_path': flowVars.request.directory ++ '/_complex/tif/',
-		'destination_name': flowVars.pid ++ '_' ++ getPageNumber ($) ++ '_tiff.tif',
-		'soruce_path': flowVars.request.directory,
-		'source_name': $,
-		'host': flowVars.request.host,
-		('username': flowVars.request.username) when flowVars.request.username != null,
-		('password': flowVars.request.password) when flowVars.request.password != null
-	}),
-	"altos": flowVars.data.files filter ($ contains 'alto') map ({
-		'correlation_id': flowVars.pid,
-		'destination_path': flowVars.request.directory ++ '/_complex/alto/',
-		'destination_name': flowVars.pid ++ '_' ++ getPageNumber ($) ++ '_alto.xml',
-		'source_path': flowVars.request.directory,
-		'source_name': $,
-		'host': flowVars.request.host,
-		('username': flowVars.request.username) when flowVars.request.username != null,
-		('password': flowVars.request.password) when flowVars.request.password != null
-	})
-}]]></dw:set-variable>
+			<dw:set-payload resource="classpath:calculate-renames.dwl"/>
 		</dw:transform-message>
+		<dw:transform-message doc:name="split into operations">
+			<dw:set-variable resource="classpath:split-into-operations.dwl" variableName="data"/>
+		</dw:transform-message>
+		<logger message="data? #[flowVars.data]" level="INFO" doc:name="Logger"/>
 		<db:update config-ref="tracking-db" doc:name="update required processing info">
 			<db:parameterized-query><![CDATA[update ${database.tracktable}
-set nr_of_moves = #[flowVars.data.altos.size () + flowVars.data.tiffs.size () + 1],
+set nr_of_moves = #[flowVars.data['altos'].size ()
+	+ flowVars.data['tifs'].size ()
+	+ flowVars.data['jp2s'].size ()
+	+ 1
+	],
 status = 'queueing-structure'
-where pid = #[payload.pid];]]></db:parameterized-query>
+where pid = #[flowVars.pid];]]></db:parameterized-query>
 		</db:update>
 		<scatter-gather doc:name="Scatter-Gather">
 			<processor-chain>
@@ -116,9 +134,8 @@ where pid = #[payload.pid];]]></db:parameterized-query>
 					<dw:set-payload resource="classpath:structures-extract-tifs.dwl"/>
 				</dw:transform-message>
 				<foreach doc:name="request tif moves">
-					<logger message="tiff stuff: #[payload]" level="INFO" doc:name="Logger"/>
 					<json:object-to-json-transformer doc:name="Object to JSON"/>
-					<amqp:outbound-endpoint responseTimeout="10000" exchange-pattern="request-response" doc:name="" exchangeName="${broker.exchanges.copy_file}"/>
+					<amqp:outbound-endpoint responseTimeout="1000"  doc:name="" exchangeName="${broker.exchanges.copy_file}"/>
 				</foreach>
 			</processor-chain>
 			<processor-chain>
@@ -126,17 +143,27 @@ where pid = #[payload.pid];]]></db:parameterized-query>
 					<dw:set-payload resource="classpath:structures-extract-altos.dwl"/>
 				</dw:transform-message>
 				<foreach doc:name="request alto moves">
-					<logger message="alto stuff: #[payload]" level="INFO" doc:name="Logger"/>
 					<json:object-to-json-transformer doc:name="Object to JSON"/>
-					<amqp:outbound-endpoint responseTimeout="10000" exchange-pattern="request-response" doc:name="AMQP-0-9" exchangeName="${broker.exchanges.copy_file}"/>
+					<amqp:outbound-endpoint responseTimeout="1000"  doc:name="AMQP-0-9" exchangeName="${broker.exchanges.copy_file}"/>
 				</foreach>
 			</processor-chain>
 			<processor-chain>
 				<dw:transform-message doc:name="Transform Message">
 					<dw:set-payload resource="classpath:structures-extract-oriignal.dwl"/>
 				</dw:transform-message>
-				<logger message="zip stuff: #[payload]" level="INFO" doc:name="Logger"/>
-				<amqp:outbound-endpoint responseTimeout="10000" exchange-pattern="request-response" doc:name="ask original zip" exchangeName="${broker.exchanges.create_zip}"/>
+				<amqp:outbound-endpoint responseTimeout="10000"  doc:name="ask original zip" exchangeName="${broker.exchanges.create_zip}"/>
+			</processor-chain>
+			<processor-chain>
+				<dw:transform-message doc:name="Transform Message">
+					<dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+flowVars.data.jp2s]]></dw:set-payload>
+				</dw:transform-message>
+				<foreach doc:name="request jp2 creation">
+					<json:object-to-json-transformer doc:name="Object to JSON"/>
+					<amqp:outbound-endpoint responseTimeout="10000"  doc:name="AMQP-0-9" exchangeName="${broker.exchanges.create_jp2}"/>
+				</foreach>
 			</processor-chain>
 		</scatter-gather>
 		<db:update config-ref="tracking-db" doc:name="Database">
@@ -149,35 +176,60 @@ where pid = #[payload.pid];]]></db:parameterized-query>
 	<flow name="file-move-completed">
 		<amqp:inbound-endpoint queueName="${broker.queues.movecomplete}" responseTimeout="10000" doc:name="file-move-completed"/>
 		<json:json-to-object-transformer doc:name="JSON to Object" returnClass="java.util.HashMap"/>
-		<logger message="AFTER FILE MOVED: #[payload]" level="INFO" doc:name="Logger"/>
-		<set-variable variableName="pid" value="#[payload.correlation_id]" doc:name="keep pid"/>
+		<set-variable variableName="pid" value="#[payload['correlation_id']]" doc:name="keep pid"/>
 		<set-variable variableName="data" value="#[payload]" doc:name="keep payload data"/>
-		<flow-ref name="check-known-pid" doc:name="known pid"/>
+		<flow-ref name="check-known-pid" doc:name="check-known-pid"/>
 		<set-variable doc:name="keep pid related data" value="#[payload]" variableName="request"/>
-		<db:update config-ref="tracking-db" doc:name="increment move count">
-			<db:parameterized-query><![CDATA[update ${database.tracktable}
+		<transactional action="ALWAYS_BEGIN" doc:name="Transactional">
+			<logger message="incrementing #[flowVars.pid] #[flowVars.data]" level="INFO" doc:name="Logger"/>
+			<db:update config-ref="tracking-db" doc:name="increment move count">
+				<db:parameterized-query><![CDATA[update ${database.tracktable}
 set nr_of_moved = nr_of_moved + 1
 where pid = #[flowVars.pid]]]></db:parameterized-query>
-		</db:update>
-		<db:select config-ref="tracking-db" doc:name="check completed">
-			<db:parameterized-query><![CDATA[select nr_of_moves - nr_of_moved from ${database.tracktable} where pid = #[flowVars.pid];]]></db:parameterized-query>
-		</db:select>
+			</db:update>
+			<db:select config-ref="tracking-db" doc:name="check completed">
+				<db:parameterized-query><![CDATA[select nr_of_moves - nr_of_moved = 0 as completed from ${database.tracktable} where pid = #[flowVars.pid];]]></db:parameterized-query>
+			</db:select>
+		</transactional>
 		<choice doc:name="is pid structure complete?">
-			<when expression="#[payload.count == 0]">
+			<when expression="#[payload[0].completed]">
+				<logger message="COMPLETED SOMETHING!!!!! #[flowVars.pid] (#[flowVars.request])" level="INFO" doc:name="Logger"/>
 				<dw:transform-message doc:name="Transform Message">
 					<dw:set-payload><![CDATA[%dw 1.0
-%output application/java
+%output application/json
 ---
 {
 	'correlation_id': flowVars.pid,
-	'directory': flowVars.request.directory ++ '/_complex'
+	'pid': flowVars.pid,
+	'directory': flowVars.request.directory ++ '/_complex',
+	'metadata': flowVars.request.metadata,
+	'agents': flowVars.request.agents,
+	'fileUse': flowVars.fileUse
 }]]></dw:set-payload>
 				</dw:transform-message>
-				<amqp:outbound-endpoint responseTimeout="10000" exchange-pattern="request-response" doc:name="request mets generation" exchangeName="${broker.exchanges.generate_mets}"/>
+				<amqp:outbound-endpoint responseTimeout="10000"  doc:name="request mets generation" exchangeName="${broker.exchanges.generate_mets}"/>
 				<db:update config-ref="tracking-db" doc:name="Database">
 					<db:parameterized-query><![CDATA[update ${database.tracktable}
 set status = 'requested-mets-generation'
-where pid = #[paylaod.pid];]]></db:parameterized-query>
+where pid = #[flowVars.pid];]]></db:parameterized-query>
+				</db:update>
+			</when>
+			<when expression="#[flowVars.data.destination_file.endsWith ('.complex')]">
+				<logger message="We have a generated complex" level="INFO" doc:name="Logger"/>
+				<dw:transform-message doc:name="Transform Message">
+					<dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+	'correlation_id': flowVars.pid,
+	'pid': flowVars.pid
+}]]></dw:set-payload>
+				</dw:transform-message>
+				<amqp:outbound-endpoint responseTimeout="10000"  doc:name="request hand off to mam system" exchangeName="${broker.exchanges.hand_off}"/>
+				<db:update config-ref="tracking-db" doc:name="Database">
+					<db:parameterized-query><![CDATA[update ${database.tracktable}
+set status = 'handing off'
+where pid = #[payload.pid];]]></db:parameterized-query>
 				</db:update>
 			</when>
 			<otherwise>
@@ -188,38 +240,60 @@ where pid = #[paylaod.pid];]]></db:parameterized-query>
 
 	<flow name="mets-generated">
 		<amqp:inbound-endpoint queueName="${broker.queues.metscomplete}" responseTimeout="10000" doc:name="mets-generated"/>
+		<json:json-to-object-transformer returnClass="java.util.HashMap" doc:name="JSON to Object"/>
+		<set-variable variableName="pid" value="#[payload['correlation_id']]" doc:name="keep pid"/>
+		<set-variable variableName="data" value="#[payload]" doc:name="keep payload data"/>
 		<flow-ref name="check-known-pid" doc:name="known pid"/>
-		<amqp:outbound-endpoint responseTimeout="10000" exchange-pattern="request-response" doc:name="request embedding alto files" exchangeName="${broker.exchanges.embed_alto}"/>
+		<set-variable variableName="request" value="#[payload]" doc:name="keep pid related data"/>
+		<dw:transform-message doc:name="Transform Message">
+			<dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+	"correlation_id": flowVars.pid,
+	"pid": flowVars.pid,
+	"directory": flowVars.request.directory ++ '/_complex'
+}]]></dw:set-payload>
+		</dw:transform-message>
+		<amqp:outbound-endpoint responseTimeout="10000"  doc:name="request embedding alto files" exchangeName="${broker.exchanges.embed_alto}"/>
 		<db:update config-ref="tracking-db" doc:name="Database">
 			<db:parameterized-query><![CDATA[update ${database.tracktable}
 set status = 'requested-alto-embeding'
-where pid = #[payload.pid];]]></db:parameterized-query>
+where pid = #[flowVars.pid];]]></db:parameterized-query>
 		</db:update>
 	</flow>
 
 	<flow name="altos-embeded">
 		<amqp:inbound-endpoint queueName="${broker.queues.altoscomplete}" responseTimeout="10000" doc:name="altos-embdede"/>
+		<json:json-to-object-transformer returnClass="java.util.HashMap" doc:name="JSON to Object"/>
+		<set-variable variableName="pid" value="#[payload['correlation_id']]" doc:name="keep pid"/>
+		<set-variable variableName="data" value="#[payload]" doc:name="keep payload data"/>
 		<flow-ref name="check-known-pid" doc:name="known pid"/>
-		<amqp:outbound-endpoint responseTimeout="10000" exchange-pattern="request-response" doc:name="request zipping into complex file" exchangeName="${broker.exchanges.create_zip}"/>
+		<set-variable variableName="request" value="#[payload]" doc:name="keep pid related data"/>
+		<dw:transform-message doc:name="Transform Message">
+			<dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+	'correlation_id': flowVars.pid,
+	'pid': flowVars.pid,
+	'source_server': '',
+	'destination_server': '',
+	'source_path': flowVars.request.directory ++ '/' ++ p ('private_dir'),
+	'destination_path': flowVars.request.directory ++ '/' ++ p ('private_dir'),
+	'destination_file': flowVars.pid ++ '.complex',
+	'excludes': [ flowVars.pid ++ '.complex' ]
+}]]></dw:set-payload>
+		</dw:transform-message>
+		<amqp:outbound-endpoint responseTimeout="10000"  doc:name="request zipping into complex file" exchangeName="${broker.exchanges.create_zip}"/>
 		<db:update config-ref="tracking-db" doc:name="Database">
 			<db:parameterized-query><![CDATA[update ${database.tracktable}
 set status = 'requested-complex-generation'
-where pid = #[payload.pid];]]></db:parameterized-query>
+where pid = #[flowVars.pid];]]></db:parameterized-query>
 		</db:update>
 	</flow>
 
-	<flow name="complex-generated">
-		<amqp:inbound-endpoint queueName="${broker.queues.complexgenerated}" responseTimeout="10000" doc:name="complex-generated"/>
-		<flow-ref name="check-known-pid" doc:name="known pid"/>
-		<amqp:outbound-endpoint responseTimeout="10000" exchange-pattern="request-response" doc:name="request hand off to mam system" exchangeName="${broker.exchanges.hand_off}"/>
-		<db:update config-ref="tracking-db" doc:name="Database">
-			<db:parameterized-query><![CDATA[update ${database.tracktable}
-set status = 'handing off'
-where pid = #[payload.pid];]]></db:parameterized-query>
-		</db:update>
-	</flow>
-
-	<flow name="check-known-pid">
+	<sub-flow name="check-known-pid">
 		<db:select config-ref="tracking-db" doc:name="Database">
 			<db:parameterized-query><![CDATA[select data from ${database.tracktable} where pid = #[flowVars.pid];]]></db:parameterized-query>
 		</db:select>
@@ -229,6 +303,24 @@ return payload.get (0).get ('data');
 ]]></scripting:script>
 		</scripting:component>
 		<json:json-to-object-transformer returnClass="java.util.HashMap" doc:name="JSON to Object"/>
-	</flow>
+	</sub-flow>
+	<sub-flow name="log">
+		<dw:transform-message doc:name="Transform Message">
+			<dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+	pid: flowVars.pid,
+	flow: flowVars.flow,
+	directory: flowVars.request.directory,
+	msg: payload.msg,
+	lvl: payload.lvl when payload.lvl != null otherwise 'info',
+	(data: payload.data) when payload.data != null
+}]]></dw:set-payload>
+		</dw:transform-message>
+		<http:request config-ref="elasticsearch" path="${elasticsearch.index}" method="POST" doc:name="HTTP"/>
+		<byte-array-to-string-transformer doc:name="Byte Array to String"/>
+		<logger level="INFO" doc:name="Logger"/>
+	</sub-flow>
 
 </mule>

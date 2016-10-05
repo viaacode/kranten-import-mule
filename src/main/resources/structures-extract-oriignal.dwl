@@ -4,6 +4,10 @@
 {
 	"correlation_id": flowVars.pid,
 	"directory": flowVars.request.directory,
-	"destination": flowVars.request.directory ++ '/_complex/original.zip',
-	"excludes": [ flowVars.request.directory ++ '_complex/' ]
+	"source_server": "",
+	"source_path": flowVars.request.directory,
+	"destination_server": "",
+	"destination_path": flowVars.request.directory ++ '/' ++ p ('private_dir'),
+	"destination_file": 'original.zip',
+	"excludes": [ p ('private_dir') ]
 }
