@@ -24,7 +24,7 @@
 	">
 
 	<flow name="start-complex-generation">
-		<amqp:inbound-endpoint queueName="${broker.queues.trigger}" responseTimeout="10000" doc:name="start-complex-generation" connector-ref="broker_connector"/>
+		<amqp:inbound-endpoint queueName="${broker.queues.trigger}" responseTimeout="10000" doc:name="start-complex-generation" connector-ref="broker_connector" exchange-pattern="request-response"/>
 		<object-to-string-transformer doc:name="Object to String"/>
 		<set-variable variableName="json" value="#[payload]" doc:name="keep json"/>
 		<json:json-to-object-transformer returnClass="java.util.HashMap" doc:name="JSON to Object"/>
@@ -55,7 +55,7 @@ where pid = #[flowVars.pid];]]></db:parameterized-query>
 	</flow>
 
 	<flow name="restart-failed-generation">
-		<amqp:inbound-endpoint queueName="${broker.queues.recover}" responseTimeout="10000" doc:name="restart-failed-generation" connector-ref="broker_connector"/>
+		<amqp:inbound-endpoint queueName="${broker.queues.recover}" responseTimeout="10000" doc:name="restart-failed-generation" connector-ref="broker_connector" exchange-pattern="request-response"/>
 		<flow-ref name="setup-related-info" doc:name="setup-related-info"/>
 		<db:update config-ref="tracking-db" doc:name="Database">
 			<db:parameterized-query><![CDATA[update ${database.tracktable}
@@ -82,7 +82,7 @@ where pid = #[flowVars.pid];]]></db:parameterized-query>
 	</flow>
 
 	<flow name="queue-listenersFlow">
-		<amqp:inbound-endpoint responseTimeout="10000" doc:name="continue-restart-after-cleared" connector-ref="broker_connector" queueName="${broker.queues.continuerecover}"/>
+		<amqp:inbound-endpoint responseTimeout="10000" doc:name="continue-restart-after-cleared" connector-ref="broker_connector" queueName="${broker.queues.continuerecover}" exchange-pattern="request-response"/>
 		<flow-ref name="setup-related-info" doc:name="Flow Reference"/>
 		<dw:transform-message doc:name="Transform Message">
 			<dw:set-payload><![CDATA[%dw 1.0
@@ -100,7 +100,7 @@ where pid = #[flowVars.pid];]]></db:parameterized-query>
 	</flow>
 
 	<flow name="list-directories-completed">
-		<amqp:inbound-endpoint queueName="${broker.queues.directorylist}" responseTimeout="10000" doc:name="list-directories-completed"  connector-ref="broker_connector"/>
+		<amqp:inbound-endpoint queueName="${broker.queues.directorylist}" responseTimeout="10000" doc:name="list-directories-completed"  connector-ref="broker_connector" exchange-pattern="request-response"/>
 		<flow-ref name="setup-related-info" doc:name="setup-related-info"/>
 		<dw:transform-message doc:name="calculate renames">
 			<dw:set-payload resource="classpath:calculate-renames.dwl"/>
@@ -167,7 +167,7 @@ where pid = #[payload.pid];]]></db:parameterized-query>
 	</flow>
 
 	<flow name="file-move-completed">
-		<amqp:inbound-endpoint queueName="${broker.queues.movecomplete}" responseTimeout="10000" doc:name="file-move-completed"  connector-ref="broker_connector"/>
+		<amqp:inbound-endpoint queueName="${broker.queues.movecomplete}" responseTimeout="10000" doc:name="file-move-completed"  connector-ref="broker_connector" exchange-pattern="request-response"/>
 		<flow-ref name="setup-related-info" doc:name="setup-related-info"/>
 		<transactional action="ALWAYS_BEGIN" doc:name="Transactional">
 			<logger message="incrementing #[flowVars.pid] #[flowVars.data]" level="INFO" doc:name="Logger"/>
@@ -236,7 +236,7 @@ where pid = #[payload.pid];]]></db:parameterized-query>
 	</flow>
 
 	<flow name="mets-generated">
-		<amqp:inbound-endpoint queueName="${broker.queues.metscomplete}" responseTimeout="10000" doc:name="mets-generated"  connector-ref="broker_connector"/>
+		<amqp:inbound-endpoint queueName="${broker.queues.metscomplete}" responseTimeout="10000" doc:name="mets-generated"  connector-ref="broker_connector" exchange-pattern="request-response"/>
 		<flow-ref name="setup-related-info" doc:name="setup-related-info"/>
 		<dw:transform-message doc:name="Transform Message">
 			<dw:set-payload><![CDATA[%dw 1.0
@@ -258,7 +258,7 @@ where pid = #[flowVars.pid];]]></db:parameterized-query>
 	</flow>
 
 	<flow name="altos-embeded">
-		<amqp:inbound-endpoint queueName="${broker.queues.altoscomplete}" responseTimeout="10000" doc:name="altos-embdede"  connector-ref="broker_connector"/>
+		<amqp:inbound-endpoint queueName="${broker.queues.altoscomplete}" responseTimeout="10000" doc:name="altos-embdede"  connector-ref="broker_connector" exchange-pattern="request-response"/>
 		<flow-ref name="setup-related-info" doc:name="setup-related-info"/>
 		<dw:transform-message doc:name="Transform Message">
 			<dw:set-payload><![CDATA[%dw 1.0
