@@ -25,11 +25,20 @@
 		<json:json-to-object-transformer returnClass="java.util.HashMap" doc:name="JSON to Object"/>
 		<set-variable variableName="pid" value="#[payload['correlation_id'] == null ? payload['pid'] : payload['correlation_id'] ]" doc:name="keep pid"/>
 		<set-variable variableName="data" value="#[payload]" doc:name="keep payload data"/>
+		<scripting:component doc:name="Groovy">
+			<scripting:script engine="Groovy"><![CDATA[import be.viaa.exceptions.StepFailedException;
+
+boolean isError = (payload.status != null && ! "ok".equalsIgnoreCase (payload.status)) || (payload.status != null && ! payload.status);
+
+if ( isError ) { throw new StepFailedException ('previous step was not successfull'); }]]></scripting:script>
+		</scripting:component>
 		<db:select config-ref="tracking-db" doc:name="Database">
 			<db:parameterized-query><![CDATA[select data from ${database.tracktable} where pid = #[flowVars.pid];]]></db:parameterized-query>
 		</db:select>
 		<scripting:component doc:name="Groovy">
-			<scripting:script engine="Groovy"><![CDATA[if ( payload.size () < 1 ) { throw new Exception ("No entry found for pid: " + flowVars.pid); }
+			<scripting:script engine="Groovy"><![CDATA[import be.viaa.exceptions.UnknownPidException;
+
+if ( payload.size () < 1 ) { throw new UnknownPidException (flowVars.pid); }
 return payload.get (0).get ('data');
 ]]></scripting:script>
 		</scripting:component>
@@ -51,13 +60,26 @@ return payload.get (0).get ('data');
 	(data: payload.data) when payload.data != null
 }]]></dw:set-payload>
 		</dw:transform-message>
+		<object-to-string-transformer doc:name="Object to String"/>
+		<logger message="LOG =&gt; #[payload]" level="INFO" doc:name="Logger"/>
+		<json:object-to-json-transformer doc:name="Object to JSON"/>
 		<http:request config-ref="elasticsearch" path="${elasticsearch.index}" method="POST" doc:name="HTTP"/>
 		<byte-array-to-string-transformer doc:name="Byte Array to String"/>
-		<logger level="INFO" doc:name="Logger"/>
 	</sub-flow>
 
 	<catch-exception-strategy name="reject-handler">
-		<amqp:reject-message doc:name="AMQP-0-9 Reject Message"/>
+        <set-variable variableName="exception" value="#[exception]" doc:name="Variable"/>
+		<dw:transform-message doc:name="Transform Message">
+			<dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+	msg: flowVars.exception.cause.message when flowVars.exception.cause != null otherwise flowVars.exception.message,
+	lvl: 'error',
+	(data: flowVars.data) when flowVars.data != null
+}]]></dw:set-payload>
+		</dw:transform-message>
+		<flow-ref name="log" doc:name="Flow Reference"/>
 	</catch-exception-strategy>
 
 </mule>
