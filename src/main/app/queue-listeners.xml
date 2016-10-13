@@ -192,7 +192,7 @@ where pid = #[flowVars.pid]]]></db:parameterized-query>
 	'directory': flowVars.request.directory ++ '/_complex',
 	'metadata': flowVars.request.metadata,
 	'agents': flowVars.request.agents,
-	'fileUse': flowVars.fileUse
+	'fileUse': flowVars.request.fileUse
 }]]></dw:set-payload>
 				</dw:transform-message>
 				<amqp:outbound-endpoint responseTimeout="10000"  doc:name="request mets generation" exchangeName="${broker.exchanges.generate_mets}"/>

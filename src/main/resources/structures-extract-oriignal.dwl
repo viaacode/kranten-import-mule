@@ -9,6 +9,6 @@
 	'source_path': flowVars.request.directory,
 	'destination_server': '',
 	'destination_path': flowVars.request.directory ++ '/' ++ p ('private_dir'),
-	'destination_file': 'original.zip',
+	'destination_file': flowVars.pid ++ '_original.zip',
 	'excludes': [ p ('private_dir') ]
 }
