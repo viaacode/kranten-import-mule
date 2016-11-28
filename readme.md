@@ -1,6 +1,6 @@
 # Kranten import mule
 
-This project glues together the microservices that can create a <pid>.complex. Ik can be
+This project glues together the microservices that can create a <pid>.complex. It can be
 initialized by placing a message on its trigger queue. This message should contain the
 pid, the directory to turn into a `.complex` file and the metadata that should be placed
 in the mets file (see mets-listener in node microservices).
@@ -19,7 +19,7 @@ CREATE TABLE tracktable (
 ```
 
 You can restart the generation of a mets file by placing a message on the recover queue.
-This message should contain the pid of a partially genarted complex file.
+This message should contain the pid of a partially generated complex file.
 
 example:
 
