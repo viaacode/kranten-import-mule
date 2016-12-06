@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<mule
+<mule xmlns:context="http://www.springframework.org/schema/context"
 	xmlns="http://www.mulesoft.org/schema/mule/core"
 	xmlns:amqp="http://www.mulesoft.org/schema/mule/amqp"
 	xmlns:db="http://www.mulesoft.org/schema/mule/db"
@@ -7,21 +7,22 @@
 	xmlns:http="http://www.mulesoft.org/schema/mule/http"
 	xmlns:spring="http://www.springframework.org/schema/beans"
 	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-	xsi:schemaLocation="
-		http://www.mulesoft.org/schema/mule/amqp http://www.mulesoft.org/schema/mule/amqp/current/mule-amqp.xsd
-		http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
-		http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
-		http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
-		http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
-	">
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/amqp http://www.mulesoft.org/schema/mule/amqp/current/mule-amqp.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-current.xsd">
 
 	<db:generic-config name="tracking-db" url="${database.url}" driverClassName="org.postgresql.Driver" doc:name="track database configuration" />
 	<db:generic-config name="metadata_db" url="${metadatadb.url}" driverClassName="org.postgresql.Driver" doc:name="Generic Database Configuration"/>
 
 	<http:request-config name="elasticsearch" host="${elasticsearch.host}" port="${elasticsearch.port}" doc:name="HTTP Request Configuration"/>
 
-	<amqp:connector name="broker_connector" validateConnections="true" doc:name="AMQP-0-9 Connector" host="${broker.host}" password="${broker.password}" port="${broker.port}" username="${broker.username}">
-		<reconnect/>
+
+	<amqp:connector name="broker_connector" validateConnections="true" doc:name="AMQP-0-9 Connector" host="${broker.host}" password="${broker.password}" port="${broker.port}" username="${broker.username}" ackMode="MULE_AUTO" prefetchCount="1">
+		<reconnect frequency="5000" count="25"></reconnect>  
 	</amqp:connector>
+    <context:property-placeholder location="${mule.env}.properties"/>
 
 </mule>

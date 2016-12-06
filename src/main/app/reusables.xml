@@ -10,16 +10,14 @@
 	xmlns:scripting="http://www.mulesoft.org/schema/mule/scripting"
 	xmlns:spring="http://www.springframework.org/schema/beans"
 	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-	xsi:schemaLocation="
-		http://www.mulesoft.org/schema/mule/amqp http://www.mulesoft.org/schema/mule/amqp/current/mule-amqp.xsd
-		http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
-		http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
-		http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
-		http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
-		http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
-		http://www.mulesoft.org/schema/mule/scripting http://www.mulesoft.org/schema/mule/scripting/current/mule-scripting.xsd
-		http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
-	">
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/amqp http://www.mulesoft.org/schema/mule/amqp/current/mule-amqp.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
+http://www.mulesoft.org/schema/mule/scripting http://www.mulesoft.org/schema/mule/scripting/current/mule-scripting.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd">
 
 	<flow name="setup-related-info">
 		<json:json-to-object-transformer returnClass="java.util.HashMap" doc:name="JSON to Object"/>
@@ -33,7 +31,7 @@ boolean isError = (payload.status != null && ! "ok".equalsIgnoreCase (payload.st
 if ( isError ) { throw new StepFailedException ('previous step was not successfull'); }]]></scripting:script>
 		</scripting:component>
 		<db:select config-ref="tracking-db" doc:name="Database">
-			<db:parameterized-query><![CDATA[select data from ${database.tracktable} where pid = #[flowVars.pid];]]></db:parameterized-query>
+            <db:parameterized-query><![CDATA[select data from ${database.tracktable} where pid = #[flowVars.pid];]]></db:parameterized-query>
 		</db:select>
 		<scripting:component doc:name="Groovy">
 			<scripting:script engine="Groovy"><![CDATA[import be.viaa.exceptions.UnknownPidException;
@@ -42,7 +40,7 @@ if ( payload.size () < 1 ) { throw new UnknownPidException (flowVars.pid); }
 return payload.get (0).get ('data');
 ]]></scripting:script>
 		</scripting:component>
-		<json:json-to-object-transformer returnClass="java.util.HashMap" doc:name="JSON to Object"/>
+        <json:json-to-object-transformer returnClass="java.util.HashMap" doc:name="JSON to Object"/>
 		<set-variable variableName="request" value="#[payload]" doc:name="keep pid related data"/>
 	</flow>
 

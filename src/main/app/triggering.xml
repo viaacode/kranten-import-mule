@@ -11,39 +11,49 @@
 	xmlns:spring="http://www.springframework.org/schema/beans"
 	xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking"
 	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-	xsi:schemaLocation="
-		http://www.mulesoft.org/schema/mule/amqp http://www.mulesoft.org/schema/mule/amqp/current/mule-amqp.xsd
-		http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
-		http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
-		http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
-		http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
-		http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
-		http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
-		http://www.mulesoft.org/schema/mule/scripting http://www.mulesoft.org/schema/mule/scripting/current/mule-scripting.xsd
-		http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
-	">
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/amqp http://www.mulesoft.org/schema/mule/amqp/current/mule-amqp.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
+http://www.mulesoft.org/schema/mule/scripting http://www.mulesoft.org/schema/mule/scripting/current/mule-scripting.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd">
 
 	<http:listener-config name="HTTP_Listener_Configuration" host="0.0.0.0" port="8081" doc:name="HTTP Listener Configuration"/>
 	<http:request-config name="pid-generator" host="do-tst-mvn-01.do.viaa.be" port="8080" basePath="/" doc:name="HTTP Request Configuration"/>
 
 	<flow name="triggeringFlow">
 		<http:listener config-ref="HTTP_Listener_Configuration" path="/" allowedMethods="POST" doc:name="HTTP"/>
-		<json:json-to-object-transformer returnClass="java.util.HashMap" doc:name="JSON to Object"/>
+        <flow-ref name="initiate_import_flow" doc:name="initiate_import_flow"/>
+	</flow>
+    <flow name="triggeringFlow1">
+        <amqp:inbound-endpoint
+			queueName="${broker.queues.ingestrequests}"
+			queueDurable="true"
+			exchange-pattern="request-response"
+			connector-ref="broker_connector"
+			doc:name="Get message from Export queue" responseTimeout="10000"/>
+        <flow-ref name="initiate_import_flow" doc:name="Flow Reference"/>
+    </flow>
+    <sub-flow name="initiate_import_flow">
+    	<json:json-to-object-transformer returnClass="java.util.HashMap" doc:name="JSON to Object"/>
 		<set-variable variableName="request" value="#[payload]" doc:name="Variable"/>
-		<db:select config-ref="metadata_db" doc:name="Database">
-			<db:parameterized-query><![CDATA[select count(*) != 0 as in_progress from ${metadatadb.table} where status = 'in_progress';]]></db:parameterized-query>
-		</db:select>
+        <db:select config-ref="metadata_db" doc:name="Database">
+            <db:parameterized-query><![CDATA[select count(*) != 0 as in_progress from ${metadatadb.table} where status = 'in_progress';]]></db:parameterized-query>
+        </db:select>
 		<logger message="in progress?? =&gt; #[payload[0].in_progress]" level="INFO" doc:name="Logger"/>
 		<choice doc:name="Choice">
 			<when expression="#[! payload[0].in_progress]">
-				<db:update config-ref="metadata_db" doc:name="mark for processing">
-					<db:parameterized-query><![CDATA[update ${metadatadb.table} as o
+                <db:update config-ref="metadata_db" doc:name="mark for processing">
+                    <db:parameterized-query><![CDATA[update ${metadatadb.table} as o
 set status = 'in_progress'
-from (select id from ${metadatadb.table} where status is null or status = 'init' limit #[flowVars.request.amount]) as s
+from (select id from ${metadatadb.table} where status = 'initialized' or status = 'init' limit #[flowVars.request.amount]) as s
 where o.id = s.id;]]></db:parameterized-query>
-				</db:update>
+                </db:update>
 				<db:select config-ref="metadata_db" doc:name="select for processing">
-					<db:parameterized-query><![CDATA[select * from ${metadatadb.table} where status = 'in_progress';]]></db:parameterized-query>
+                    <db:parameterized-query><![CDATA[select * from ${metadatadb.table} where status = 'in_progress';]]></db:parameterized-query>
 				</db:select>
 		<collection-splitter doc:name="Collection Splitter"/>
 				<set-variable variableName="row" value="#[payload]" doc:name="keep db entry"/>
@@ -60,11 +70,11 @@ where o.id = s.id;]]></db:parameterized-query>
 				</enricher>
 				<json:json-to-object-transformer returnClass="java.util.HashMap" doc:name="JSON to Object"/>
 				<enricher source="payload" target="flowVars.updated" doc:name="Message Enricher">
-					<db:update config-ref="metadata_db" doc:name="Database">
-						<db:parameterized-query><![CDATA[update ${metadatadb.table}
+                    <db:update config-ref="metadata_db" doc:name="Database">
+                        <db:parameterized-query><![CDATA[update ${metadatadb.table}
 set status = 'delivered', viaa_pid=#[flowVars.pid]
 where id = #[flowVars.row.id];]]></db:parameterized-query>
-					</db:update>
+                    </db:update>
 				</enricher>
 		<collection-aggregator failOnTimeout="true" doc:name="Collection Aggregator"/>
 			</when>
@@ -82,7 +92,7 @@ where id = #[flowVars.row.id];]]></db:parameterized-query>
 			</otherwise>
 		</choice>
 		<json:object-to-json-transformer doc:name="Object to JSON"/>
-	</flow>
+    </sub-flow>
 
 	<flow name="uuid-id">
 		<expression-transformer expression="#[java.util.UUID.randomUUID ().toString ()]" doc:name="Expression" returnClass="java.lang.String"/>
@@ -91,12 +101,11 @@ where id = #[flowVars.row.id];]]></db:parameterized-query>
 	<flow name="pid-id">
 		<http:request config-ref="pid-generator" path="/pid-qas" method="GET" doc:name="HTTP">
 			<http:request-builder>
-				<http:query-param paramName="number" value="1"/>
+                <http:query-param paramName="number" value="1"/>
 			</http:request-builder>
 		</http:request>
-		<object-to-string-transformer doc:name="Object to String"/>
 		<json:json-to-object-transformer returnClass="java.util.LinkedList" doc:name="JSON to Object"/>
-		<expression-transformer returnClass="java.lang.String" expression="#['&quot;' + payload[0].id + '&quot;']" doc:name="Expression"/>
+        <set-payload value="#[payload[0].id]" doc:name="Set Payload"/>
 	</flow>
 
 </mule>
