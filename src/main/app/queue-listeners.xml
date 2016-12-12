@@ -46,14 +46,13 @@ values (#[flowVars.pid], 'initialized', #[flowVars.json]);]]></db:parameterized-
 {
 	'correlation_id': flowVars.pid,
 	'pid': flowVars.pid,
-	'directory': flowVars.request.directory,
-	'excludes': ['_complex']
+	'directory': flowVars.request.directory
 }]]></dw:set-payload>
 		</dw:transform-message>
-		<amqp:outbound-endpoint exchangeName="${broker.exchanges.list_directory}" responseTimeout="10000"  doc:name="request directory listing" connector-ref="broker_connector"/>
-		<db:update config-ref="tracking-db" doc:name="Database">
+		<amqp:outbound-endpoint exchangeName="${broker.exchanges.rm_private_dir}" responseTimeout="10000"  doc:name="request removing private dir" connector-ref="broker_connector"/>
+		<db:update config-ref="tracking-db" doc:name="Set status to 'requested-initialize'">
             <db:parameterized-query><![CDATA[update ${database.tracktable}
-set status = 'requested-directory-listing'
+set status = 'requested-initialize'
 where pid = #[flowVars.pid];]]></db:parameterized-query>
 		</db:update>
 		<exception-strategy ref="reject-handler" doc:name="Reference Exception Strategy"/>
@@ -85,7 +84,7 @@ where pid = #[flowVars.pid];]]></db:parameterized-query>
 		</dw:transform-message>
 		<amqp:outbound-endpoint exchangeName="${broker.exchanges.rm_private_dir}" responseTimeout="10000" doc:name="request removing private dir" connector-ref="broker_connector"/>
 		<db:update config-ref="tracking-db" doc:name="Database">
-			<db:parameterized-query><![CDATA[update ${database.tracktable}
+            <db:parameterized-query><![CDATA[update ${database.tracktable}
 set status = 'restarting-generation'
 where pid = #[flowVars.pid];]]></db:parameterized-query>
 		</db:update>
