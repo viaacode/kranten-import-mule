@@ -4,14 +4,14 @@ database.tracktable=
 database.db=
 database.host=
 # database.host=
-database.url=
+database.url=jdbc:postgresql://${database.host}/${database.db}?user=${database.username}&password=${database.password}
 
 metadatadb.password=
 metadatadb.username=
 metadatadb.table=
 metadatadb.db=
 metadatadb.host=
-metadatadb.url=
+metadatadb.url=jdbc:postgresql://${metadatadb.host}/${metadatadb.db}?user=${metadatadb.username}&password=${metadatadb.password}
 
 broker.host=
 broker.port=
