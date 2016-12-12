@@ -111,7 +111,7 @@ where pid = #[flowVars.pid];]]></db:parameterized-query>
 	'excludes': ['_complex']
 }]]></dw:set-payload>
 		</dw:transform-message>
-		<amqp:outbound-endpoint responseTimeout="10000" doc:name="AMQP-0-9" connector-ref="broker_connector" exchangeName="${broker.exchanges.list_directory}"/>
+		<amqp:outbound-endpoint responseTimeout="10000" doc:name="request directory listing" connector-ref="broker_connector" exchangeName="${broker.exchanges.list_directory}"/>
 		<exception-strategy ref="reject-handler" doc:name="Reference Exception Strategy"/>
 	</flow>
 

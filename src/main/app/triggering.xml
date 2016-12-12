@@ -66,7 +66,7 @@ where o.id = s.id;]]></db:parameterized-query>
 		</dw:transform-message>
 				<json:object-to-json-transformer doc:name="Object to JSON"/>
 				<enricher source="payload" target="flowVars.ignored" doc:name="Message Enricher">
-					<amqp:outbound-endpoint queueName="${broker.queues.trigger}" responseTimeout="10000" connector-ref="broker_connector" doc:name="AMQP-0-9"/>
+					<amqp:outbound-endpoint queueName="${broker.queues.trigger}" responseTimeout="10000" connector-ref="broker_connector" doc:name="broker.queues.trigger"/>
 				</enricher>
 				<json:json-to-object-transformer returnClass="java.util.HashMap" doc:name="JSON to Object"/>
 				<enricher source="payload" target="flowVars.updated" doc:name="Message Enricher">
