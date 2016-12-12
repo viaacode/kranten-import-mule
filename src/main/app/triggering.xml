@@ -22,7 +22,7 @@ http://www.mulesoft.org/schema/mule/scripting http://www.mulesoft.org/schema/mul
 http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd">
 
 	<http:listener-config name="HTTP_Listener_Configuration" host="0.0.0.0" port="8081" doc:name="HTTP Listener Configuration"/>
-	<http:request-config name="pid-generator" host="do-tst-mvn-01.do.viaa.be" port="8080" basePath="/" doc:name="HTTP Request Configuration"/>
+	<http:request-config name="pid-generator" host="${pidservice.host}" port="${pidservice.port}" basePath="/" doc:name="HTTP Request Configuration"/>
 
 	<flow name="triggeringFlow">
 		<http:listener config-ref="HTTP_Listener_Configuration" path="/" allowedMethods="POST" doc:name="HTTP"/>
