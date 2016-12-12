@@ -28,7 +28,7 @@
 						'archief': { '#text': 'OORLOG' },
 						'deelarchief': { '#text': payload.type }
 					},
-					'date': { '#text': payload.datum_clean },
+					'date': { '#text': (payload.datum_clean replace 'x' with 'u') },
 					'original_carrier_id': { '#text': payload.vol_folder_name },
 					'PID': { '#text': flowVars.pid },
 					'CP': { '#text': 'cegesoma' },
