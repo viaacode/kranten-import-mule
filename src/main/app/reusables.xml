@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<mule
+<mule xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking"
 	xmlns="http://www.mulesoft.org/schema/mule/core"
 	xmlns:amqp="http://www.mulesoft.org/schema/mule/amqp"
 	xmlns:db="http://www.mulesoft.org/schema/mule/db"
@@ -17,9 +17,10 @@ http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee
 http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
 http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
 http://www.mulesoft.org/schema/mule/scripting http://www.mulesoft.org/schema/mule/scripting/current/mule-scripting.xsd
-http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd">
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
 
-	<flow name="setup-related-info">
+	<flow name="setup-related-info" initialState="started">
 		<json:json-to-object-transformer returnClass="java.util.HashMap" doc:name="JSON to Object"/>
 		<set-variable variableName="pid" value="#[payload['correlation_id'] == null ? payload['pid'] : payload['correlation_id'] ]" doc:name="keep pid"/>
 		<set-variable variableName="data" value="#[payload]" doc:name="keep payload data"/>

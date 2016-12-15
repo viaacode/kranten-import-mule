@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<mule
+<mule xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata"
 	xmlns="http://www.mulesoft.org/schema/mule/core"
 	xmlns:amqp="http://www.mulesoft.org/schema/mule/amqp"
 	xmlns:db="http://www.mulesoft.org/schema/mule/db"
@@ -63,6 +63,10 @@ where o.id = s.id;]]></db:parameterized-query>
 		</enricher>
 		<dw:transform-message doc:name="Transform Message">
 			<dw:set-payload resource="classpath:metadata-db-info-to-trigger.dwl"/>
+                    <dw:set-variable variableName="instelling"><![CDATA[%dw 1.0
+%output application/java
+---
+payload.instelling]]></dw:set-variable>
 		</dw:transform-message>
 				<json:object-to-json-transformer doc:name="Object to JSON"/>
 				<enricher source="payload" target="flowVars.ignored" doc:name="Message Enricher">
@@ -97,6 +101,110 @@ where id = #[flowVars.row.id];]]></db:parameterized-query>
 	<flow name="uuid-id">
 		<expression-transformer expression="#[java.util.UUID.randomUUID ().toString ()]" doc:name="Expression" returnClass="java.lang.String"/>
 	</flow>
+    <flow name="organization">
+        <choice doc:name="Choice">
+            <when expression="#[payload.equals(&quot;Soma&quot;)]">
+                <logger level="INFO" doc:name="Soma" message="Soma"/>
+                <dw:transform-message doc:name="Transform Message">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[
+	'CP': { '#text': 'CEGESOMA' },
+	'OR_id': { '#text': 'OR-fx73x4x' }
+]]]></dw:set-payload>
+                </dw:transform-message>
+            </when>
+            <when expression="#[payload.equals(&quot;ProvBibLimburg&quot;)]">
+                <logger level="INFO" doc:name="ProvBibLimburg" message="ProvBibLimburg"/>
+                                <dw:transform-message doc:name="Transform Message">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[
+	'CP': { '#text': 'Provinciale Bibliotheek Limburg' },
+	'OR_id': { '#text': 'OR-z31nn3s' }
+]]]></dw:set-payload>
+                </dw:transform-message>
+            </when>
+            <when expression="#[payload.equals(&quot;UGent&quot;)]">
+                <logger level="INFO" doc:name="UGent" message="UGent"/>
+                                <dw:transform-message doc:name="Transform Message">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[
+	'CP': { '#text': 'UGent' },
+	'OR_id': { '#text': 'OR-0z70w1b' },
+	'Sub_CP': { '#text': 'universiteitsbibliotheek' }
+]]]></dw:set-payload>
+                </dw:transform-message>
+            </when>
+            <when expression="#[payload.equals(&quot;SBKortrijk&quot;)]">
+                <logger level="INFO" doc:name="SBKortrijk" message="SBKortrijk"/>
+                                <dw:transform-message doc:name="Transform Message">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[
+	'CP': { '#text': 'Stadsbibliotheek Kortrijk' },
+	'OR_id': { '#text': 'OR-kk94b7d' }
+]]]></dw:set-payload>
+                </dw:transform-message>
+            </when>
+            <when expression="#[payload.equals(&quot;ARA&quot;)]">
+                <logger level="INFO" doc:name="ARA" message="ARA"/>
+                                <dw:transform-message doc:name="Transform Message">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[
+	'CP': { '#text': 'Algemeen Rijksarchief' },
+	'OR_id': { '#text': 'OR-fx73x54' }
+]]]></dw:set-payload>
+                </dw:transform-message>
+            </when>
+            <when expression="#[payload.equals(&quot;KB&quot;)]">
+                <logger level="INFO" doc:name="KB" message="KB"/>
+                                <dw:transform-message doc:name="Transform Message">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[
+	'CP': { '#text': 'Koninklijke Bibliotheek' },
+	'OR_id': { '#text': 'OR-b56d422' }
+]]]></dw:set-payload>
+                </dw:transform-message>
+            </when>
+            <when expression="#[payload.equals(&quot;KLM&quot;)]">
+                <logger level="INFO" doc:name="KLM" message="KLM"/>
+                                <dw:transform-message doc:name="Transform Message">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[
+	'CP': { '#text': 'Koninklijk Museum van het Leger en de Krijgsgeschiedenis' },
+	'OR_id': { '#text': 'OR-6d5p979' }
+]]]></dw:set-payload>
+                </dw:transform-message>
+            </when>
+            <when expression="#[payload.equals(&quot;SBA&quot;)]">
+                <logger level="INFO" doc:name="SBA" message="SBA"/>
+                                <dw:transform-message doc:name="Transform Message">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[
+	'CP': { '#text': 'Erfgoedbibliotheek Hendrik Conscience' },
+	'OR_id': { '#text': 'OR-v97zq9j' }
+]]]></dw:set-payload>
+                </dw:transform-message>
+            </when>
+            <otherwise>
+                <expression-component doc:name="Expression"><![CDATA[throw new StepFailedException ('The CP was not found');]]></expression-component>
+            </otherwise>
+        </choice>
+    </flow>
 
 	<flow name="pid-id">
 		<http:request config-ref="pid-generator" path="/pid-qas" method="GET" doc:name="HTTP">

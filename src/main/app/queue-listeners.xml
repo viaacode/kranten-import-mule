@@ -46,7 +46,7 @@ values (#[flowVars.pid], 'initialized', #[flowVars.json]);]]></db:parameterized-
 {
 	'correlation_id': flowVars.pid,
 	'pid': flowVars.pid,
-	'directory': flowVars.request.directory
+	'directory': flowVars.request.directory ++ '/' ++ p('private_dir')
 }]]></dw:set-payload>
 		</dw:transform-message>
 		<amqp:outbound-endpoint exchangeName="${broker.exchanges.rm_private_dir}" responseTimeout="10000"  doc:name="request removing private dir" connector-ref="broker_connector"/>
@@ -107,7 +107,7 @@ where pid = #[flowVars.pid];]]></db:parameterized-query>
 	'correlation_id': flowVars.pid,
 	'pid': flowVars.pid,
 	'directory': flowVars.request.directory,
-	'excludes': ['_complex']
+	'excludes': ['_complex', '.nfs']
 }]]></dw:set-payload>
 		</dw:transform-message>
 		<amqp:outbound-endpoint responseTimeout="10000" doc:name="request directory listing" connector-ref="broker_connector" exchangeName="${broker.exchanges.list_directory}"/>
@@ -120,7 +120,7 @@ where pid = #[flowVars.pid];]]></db:parameterized-query>
 		<dw:transform-message doc:name="calculate renames">
 			<dw:set-payload resource="classpath:calculate-renames.dwl"/>
 		</dw:transform-message>
-		<logger message="#[payload]" level="INFO" doc:name="Logger"/>
+        <logger message="#[payload]" level="INFO" doc:name="Logger"/>
 		<dw:transform-message doc:name="split into operations">
 			<dw:set-variable resource="classpath:split-into-operations.dwl" variableName="data"/>
 		</dw:transform-message>
@@ -134,48 +134,55 @@ set nr_of_moves = #[
 status = 'queueing-structure'
 where pid = #[flowVars.pid];]]></db:parameterized-query>
         </db:update>
-        <scatter-gather doc:name="Scatter-Gather">
-            <processor-chain>
-                <dw:transform-message doc:name="Transform Message">
-                    <dw:set-payload resource="classpath:structures-extract-tifs.dwl"/>
-                </dw:transform-message>
-                <foreach doc:name="request tif moves">
-                    <json:object-to-json-transformer doc:name="Object to JSON"/>
-                    <amqp:outbound-endpoint exchangeName="${broker.exchanges.copy_file}" responseTimeout="1000" connector-ref="broker_connector" doc:name="broker.exchanges.copy_file"/>
-                </foreach>
-            </processor-chain>
-            <processor-chain>
-                <dw:transform-message doc:name="Transform Message">
-                    <dw:set-payload resource="classpath:structures-extract-altos.dwl"/>
-                </dw:transform-message>
-                <foreach doc:name="request alto moves">
-                    <json:object-to-json-transformer doc:name="Object to JSON"/>
-                    <amqp:outbound-endpoint exchangeName="${broker.exchanges.copy_file}" responseTimeout="1000" connector-ref="broker_connector" doc:name="broker.exchanges.copy_file"/>
-                </foreach>
-            </processor-chain>
-            <processor-chain>
-                <dw:transform-message doc:name="Transform Message">
-                    <dw:set-payload resource="classpath:structures-extract-oriignal.dwl"/>
-                </dw:transform-message>
-                <amqp:outbound-endpoint exchangeName="${broker.exchanges.create_zip}" responseTimeout="10000" connector-ref="broker_connector" doc:name="ask original zip"/>
-            </processor-chain>
-            <processor-chain>
-                <dw:transform-message doc:name="Transform Message">
-                    <dw:set-payload><![CDATA[%dw 1.0
+        <choice doc:name="Choice">
+            <when expression="#[flowVars.data['altos'].size () + flowVars.data['tifs'].size () + flowVars.data['jp2s'].size () &gt; 0]">
+                <scatter-gather doc:name="Scatter-Gather">
+                    <processor-chain>
+                        <dw:transform-message doc:name="Transform Message">
+                            <dw:set-payload resource="classpath:structures-extract-tifs.dwl"/>
+                        </dw:transform-message>
+                        <foreach doc:name="request tif moves">
+                            <json:object-to-json-transformer doc:name="Object to JSON"/>
+                            <amqp:outbound-endpoint exchangeName="${broker.exchanges.copy_file}" responseTimeout="1000" connector-ref="broker_connector" doc:name="broker.exchanges.copy_file"/>
+                        </foreach>
+                    </processor-chain>
+                    <processor-chain>
+                        <dw:transform-message doc:name="Transform Message">
+                            <dw:set-payload resource="classpath:structures-extract-altos.dwl"/>
+                        </dw:transform-message>
+                        <foreach doc:name="request alto moves">
+                            <json:object-to-json-transformer doc:name="Object to JSON"/>
+                            <amqp:outbound-endpoint exchangeName="${broker.exchanges.copy_file}" responseTimeout="1000" connector-ref="broker_connector" doc:name="broker.exchanges.copy_file"/>
+                        </foreach>
+                    </processor-chain>
+                    <processor-chain>
+                        <dw:transform-message doc:name="Transform Message">
+                            <dw:set-payload resource="classpath:structures-extract-oriignal.dwl"/>
+                        </dw:transform-message>
+                        <amqp:outbound-endpoint exchangeName="${broker.exchanges.create_zip}" responseTimeout="10000" connector-ref="broker_connector" doc:name="ask original zip"/>
+                    </processor-chain>
+                    <processor-chain>
+                        <dw:transform-message doc:name="Transform Message">
+                            <dw:set-payload><![CDATA[%dw 1.0
 %output application/java
 ---
 flowVars.data.jp2s]]></dw:set-payload>
-                </dw:transform-message>
-                <foreach doc:name="request jp2 creation">
-                    <json:object-to-json-transformer doc:name="Object to JSON"/>
-                    <amqp:outbound-endpoint exchangeName="${broker.exchanges.create_jp2}" responseTimeout="10000" connector-ref="broker_connector" doc:name="broker.exchanges.copy_file"/>
-                </foreach>
-            </processor-chain>
-        </scatter-gather>
+                        </dw:transform-message>
+                        <foreach doc:name="request jp2 creation">
+                            <json:object-to-json-transformer doc:name="Object to JSON"/>
+                            <amqp:outbound-endpoint exchangeName="${broker.exchanges.create_jp2}" responseTimeout="10000" connector-ref="broker_connector" doc:name="broker.exchanges.copy_file"/>
+                        </foreach>
+                    </processor-chain>
+                </scatter-gather>
+            </when>
+            <otherwise>
+                <logger message="Directory is empty. Mark as empty in database and don't send any messages." level="INFO" doc:name="Logger"/>
+            </otherwise>
+        </choice>
 		<db:update config-ref="tracking-db" doc:name="Set status to 'queued-structure' or 'empty-directory'">
             <db:parameterized-query><![CDATA[update ${database.tracktable}
-set status = #[flowVars.data['altos'].size () + flowVars.data['tifs'].size () + flowVars.data['jp2s'].size ()) > 0 ? 'queued-structure' : 'empty-directory']
-where pid = #[payload.pid];]]></db:parameterized-query>
+set status = #[flowVars.data['altos'].size () + flowVars.data['tifs'].size () + flowVars.data['jp2s'].size () > 0 ? 'queued-structure' : 'empty-directory']
+where pid = #[flowVars.pid];]]></db:parameterized-query>
 		</db:update>
 		<exception-strategy ref="reject-handler" doc:name="Reference Exception Strategy"/>
 	</flow>
@@ -206,7 +213,8 @@ where pid = #[flowVars.pid]]]></db:parameterized-query>
 	'directory': flowVars.request.directory ++ '/_complex',
 	'metadata': flowVars.request.metadata,
 	'agents': flowVars.request.agents,
-	'fileUse': flowVars.request.fileUse
+	'fileUse': flowVars.request.fileUse,
+	'excludes': [ '.complex', '.nfs']
 }]]></dw:set-payload>
 				</dw:transform-message>
 				<amqp:outbound-endpoint responseTimeout="10000"  doc:name="request mets generation" exchangeName="${broker.exchanges.generate_mets}" connector-ref="broker_connector"/>
@@ -285,7 +293,7 @@ where pid = #[flowVars.pid];]]></db:parameterized-query>
 	'source_path': flowVars.request.directory ++ '/' ++ p('private_dir'),
 	'destination_path': flowVars.request.directory ++ '/' ++ p('private_dir'),
 	'destination_file': flowVars.pid ++ '.complex',
-	'excludes': [ '.complex' ]
+	'excludes': [ '.complex', '.nfs']
 }]]></dw:set-payload>
 		</dw:transform-message>
         <amqp:outbound-endpoint exchangeName="${broker.exchanges.create_zip}" responseTimeout="10000" doc:name="request zipping into complex file" connector-ref="broker_connector"/>

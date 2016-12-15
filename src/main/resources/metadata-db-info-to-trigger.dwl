@@ -30,12 +30,10 @@
 					},
 					'date': { '#text': (payload.datum_clean replace 'x' with 'u') },
 					'original_carrier_id': { '#text': payload.vol_folder_name },
+					'SP': { '#text': 'CEGESOMA' },
 					'PID': { '#text': flowVars.pid },
-					'CP': { '#text': 'cegesoma' },
-					'Original_CP': { '#text': payload.instelling },
-
+					(lookup("organization", payload.instelling)),
 					'type': { '#text': 'Paper' },
-
 					'subject': {
 						'\$type': 'list',
 						subject: { '#text': payload.oorlog }
