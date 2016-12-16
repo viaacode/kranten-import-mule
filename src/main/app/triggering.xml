@@ -207,7 +207,7 @@ where id = #[flowVars.row.id];]]></db:parameterized-query>
     </flow>
 
 	<flow name="pid-id">
-		<http:request config-ref="pid-generator" path="/pid-qas" method="GET" doc:name="HTTP">
+		<http:request config-ref="pid-generator" path="/pid-prod" method="GET" doc:name="HTTP">
 			<http:request-builder>
                 <http:query-param paramName="number" value="1"/>
 			</http:request-builder>
