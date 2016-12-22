@@ -16,10 +16,6 @@
 		'roles': [ 'ARCHIVIST' ],
 		'type': 'ORGANIZATION',
 		'name': 'VIAA'
-	},{
-		'roles': [ 'IPOWNER' ],
-		'type': 'ORGANIZATION',
-		'name': lower (lookup("organization", payload.instelling)).CP
 	}],
 
 	'metadata': {
