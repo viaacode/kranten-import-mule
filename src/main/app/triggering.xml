@@ -53,7 +53,16 @@ from (select id from ${metadatadb.table} where status = 'initialized' or status 
 where o.id = s.id;]]></db:parameterized-query>
                 </db:update>
 				<db:select config-ref="metadata_db" doc:name="select for processing">
-                    <db:parameterized-query><![CDATA[select * from ${metadatadb.table} where status = 'in_progress';]]></db:parameterized-query>
+                    <db:parameterized-query><![CDATA[SELECT * FROM (select
+gazetten.id, gazetten.viaa_pid, gazetten.vol_id, gazetten.tit_id, corrections.vol_cote, gazetten.vol_additional_cote, gazetten.vol_unique_num, corrections.vol_folder_name,
+gazetten.titre, gazetten.opm, gazetten.dag, gazetten.instelling, gazetten.dagen, gazetten.plaatsingsnummer, gazetten.fz, gazetten.datum,
+gazetten.datum_clean, gazetten.dor, gazetten.jaar, gazetten.maand, gazetten.annex, gazetten.oorlog, gazetten.nr_guide, gazetten.gevonden, gazetten.verschenen,
+gazetten.gescand, gazetten.plaats_van_uitgave, gazetten.extra, gazetten.minder, gazetten.type
+from ${metadatadb.table} gazetten
+LEFT JOIN corrections
+ON gazetten.id = corrections.gazet_fk
+WHERE corrections.verified = true
+AND gazetten.status = 'in_progress') temp LIMIT 1;]]></db:parameterized-query>
 				</db:select>
 		<collection-splitter doc:name="Collection Splitter"/>
 				<set-variable variableName="row" value="#[payload]" doc:name="keep db entry"/>
