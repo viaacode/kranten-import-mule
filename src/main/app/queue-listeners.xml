@@ -218,11 +218,11 @@ where pid = #[flowVars.pid]]]></db:parameterized-query>
 }]]></dw:set-payload>
 				</dw:transform-message>
 				<amqp:outbound-endpoint responseTimeout="10000"  doc:name="request mets generation" exchangeName="${broker.exchanges.generate_mets}" connector-ref="broker_connector"/>
-				<db:update config-ref="tracking-db" doc:name="Database">
+                <db:update config-ref="tracking-db" doc:name="Database">
                     <db:parameterized-query><![CDATA[update ${database.tracktable}
 set status = 'requested-mets-generation'
 where pid = #[flowVars.pid];]]></db:parameterized-query>
-				</db:update>
+                </db:update>
 			</when>
 			<when expression="#[flowVars.data.destination_file != null &amp;&amp; flowVars.data.destination_file.endsWith ('.complex')]">
 <dw:transform-message doc:name="Transform Message">
@@ -247,7 +247,7 @@ where pid = #[flowVars.pid];]]></db:parameterized-query>
                 <db:update config-ref="tracking-db" doc:name="Database">
                     <db:parameterized-query><![CDATA[update ${database.tracktable}
 set status = 'handing off'
-where pid = #[payload.pid];]]></db:parameterized-query>
+where pid = #[flowVars.pid];]]></db:parameterized-query>
                 </db:update>
 			</when>
 			<otherwise>
