@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<mule 
-    xmlns="http://www.mulesoft.org/schema/mule/core" 
+<mule xmlns="http://www.mulesoft.org/schema/mule/core" 
     xmlns:amqp="http://www.mulesoft.org/schema/mule/amqp" 
     xmlns:db="http://www.mulesoft.org/schema/mule/db" 
     xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" 
@@ -10,7 +9,16 @@
     xmlns:scripting="http://www.mulesoft.org/schema/mule/scripting" 
     xmlns:spring="http://www.springframework.org/schema/beans" 
     xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" 
-    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/amqp http://www.mulesoft.org/schema/mule/amqp/current/mule-amqp.xsdhttp://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsdhttp://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsdhttp://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsdhttp://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsdhttp://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsdhttp://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsdhttp://www.mulesoft.org/schema/mule/scripting http://www.mulesoft.org/schema/mule/scripting/current/mule-scripting.xsdhttp://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd">
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.mulesoft.org/schema/mule/amqp http://www.mulesoft.org/schema/mule/amqp/current/mule-amqp.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
+http://www.mulesoft.org/schema/mule/scripting http://www.mulesoft.org/schema/mule/scripting/current/mule-scripting.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd">
     <flow name="start-complex-generation">
         <amqp:inbound-endpoint queueName="${broker.queues.trigger}" queueDurable="true" responseTimeout="10000" doc:name="start-complex-generation" connector-ref="broker_connector" exchange-pattern="request-response"/>
         <object-to-string-transformer doc:name="Object to String"/>
@@ -250,6 +258,36 @@ where pid = #[flowVars.pid];]]>
                     </db:parameterized-query>
                 </db:update>
             </when>
+            <when expression="#[flowVars.data.destination_file != null &amp;&amp; flowVars.data.destination_file.endsWith ('_inuits.zip')]">
+                <dw:transform-message doc:name="Transform Message">
+                    <dw:set-payload>
+                        <![CDATA[%dw 1.0
+%output application/json
+---
+{
+	'destination_file': flowVars.pid ++ '.zip',
+	'destination_host': p('ftpDestination.inuits.host'),
+	'destination_password': p('ftpDestination.inuits.password'),
+	'destination_path': p('ftpDestination.inuits.path'),
+	'destination_user': p('ftpDestination.inuits.username'),
+	'source_path': flowVars.request.directory ++ '/_complex',
+	'source_file': flowVars.pid ++ '_inuits.zip',
+	'source_host': p('ftpsource.cegesoma.host'),
+	'source_user': p('ftpsource.cegesoma.username'),
+	'source_password': p('ftpsource.cegesoma.password'),
+	'move': false
+}]]>
+                    </dw:set-payload>
+                </dw:transform-message>
+                <amqp:outbound-endpoint responseTimeout="10000" doc:name="request fxp to inuits folder" exchangeName="${broker.exchanges.hand_off}" connector-ref="handoff_connector"/>
+                <db:update config-ref="tracking-db" doc:name="Database">
+                    <db:parameterized-query>
+                        <![CDATA[update ${database.tracktable}
+set status = 'handing off'
+where pid = #[flowVars.pid];]]>
+                    </db:parameterized-query>
+                </db:update>
+            </when>
             <otherwise>
                 <logger message="Not completed #[flowVars.pid]" level="INFO" doc:name="Logger"/>
             </otherwise>
@@ -284,9 +322,10 @@ where pid = #[flowVars.pid];]]>
     <flow name="altos-embeded">
         <amqp:inbound-endpoint queueName="${broker.queues.altoscomplete}" responseTimeout="10000" doc:name="altos-embdede" connector-ref="broker_connector" exchange-pattern="request-response"/>
         <flow-ref name="setup-related-info" doc:name="setup-related-info"/>
-        <dw:transform-message doc:name="Transform Message">
-            <dw:set-payload>
-                <![CDATA[%dw 1.0
+        <scatter-gather doc:name="Scatter-Gather">
+            <processor-chain>
+                <dw:transform-message doc:name="Transform Message">
+                    <dw:set-payload><![CDATA[%dw 1.0
 %output application/json
 ---
 {
@@ -297,11 +336,30 @@ where pid = #[flowVars.pid];]]>
 	'source_path': flowVars.request.directory ++ '/' ++ p('private_dir'),
 	'destination_path': flowVars.request.directory ++ '/' ++ p('private_dir'),
 	'destination_file': flowVars.pid ++ '.complex',
-	'excludes': [ '.complex', '.nfs']
-}]]>
-            </dw:set-payload>
-        </dw:transform-message>
-        <amqp:outbound-endpoint exchangeName="${broker.exchanges.create_zip}" responseTimeout="10000" doc:name="request zipping into complex file" connector-ref="broker_connector"/>
+	'excludes': [ '.complex', '.nfs', flowVars.pid ++ '_inuits.zip']
+}]]></dw:set-payload>
+                </dw:transform-message>
+                <amqp:outbound-endpoint exchangeName="${broker.exchanges.create_zip}" responseTimeout="10000" connector-ref="broker_connector" doc:name="request zipping into complex file"/>
+            </processor-chain>
+                        <processor-chain>
+                <dw:transform-message doc:name="Transform Message">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+	'correlation_id': flowVars.pid,
+	'pid': flowVars.pid,
+	'source_server': '',
+	'destination_server': '',
+	'source_path': flowVars.request.directory ++ '/' ++ p('private_dir'),
+	'destination_path': flowVars.request.directory ++ '/' ++ p('private_dir'),
+	'destination_file': flowVars.pid ++ '_inuits.zip',
+	'excludes': [ '.complex', '.nfs', '.zip', 'tif']
+}]]></dw:set-payload>
+                </dw:transform-message>
+                <amqp:outbound-endpoint exchangeName="${broker.exchanges.create_zip}" responseTimeout="10000" connector-ref="broker_connector" doc:name="request zipping browses into zip file"/>
+            </processor-chain>
+        </scatter-gather>
         <db:update config-ref="tracking-db" doc:name="Database">
             <db:parameterized-query>
                 <![CDATA[update ${database.tracktable}
