@@ -25,12 +25,11 @@ http://www.springframework.org/schema/beans http://www.springframework.org/schem
         <set-variable variableName="json" value="#[payload]" doc:name="keep json"/>
         <json:json-to-object-transformer returnClass="java.util.HashMap" doc:name="JSON to Object"/>
         <set-variable variableName="pid" value="#[payload['pid']]" doc:name="set pid"/>
+        <set-variable variableName="id" value="#[payload['id']]" doc:name="Set id"/>
         <set-variable variableName="request" value="#[payload]" doc:name="keep request"/>
         <db:insert config-ref="tracking-db" doc:name="Database">
-            <db:parameterized-query>
-                <![CDATA[insert into ${database.tracktable} (pid, status, data)
-values (#[flowVars.pid], 'initialized', #[flowVars.json]);]]>
-            </db:parameterized-query>
+            <db:parameterized-query><![CDATA[insert into ${database.tracktable} (pid, status, data, gazet_fk)
+values (#[flowVars.pid], 'initialized', #[flowVars.json], #[flowVars.id]);]]></db:parameterized-query>
         </db:insert>
         <dw:transform-message doc:name="Transform Message">
             <dw:set-payload>
@@ -189,11 +188,9 @@ where pid = #[flowVars.pid];]]>
         <transactional action="ALWAYS_BEGIN" doc:name="Transactional">
             <logger message="incrementing #[flowVars.pid] #[flowVars.data]" level="INFO" doc:name="Logger"/>
             <db:update config-ref="tracking-db" doc:name="increment move count">
-                <db:parameterized-query>
-                    <![CDATA[update ${database.tracktable}
+                <db:parameterized-query><![CDATA[update ${database.tracktable}
 set nr_of_moved = nr_of_moved + 1
-where pid = #[flowVars.pid]]]>
-                </db:parameterized-query>
+where pid = #[flowVars.pid]]]></db:parameterized-query>
             </db:update>
             <db:select config-ref="tracking-db" doc:name="check completed">
                 <db:parameterized-query>
