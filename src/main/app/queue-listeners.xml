@@ -57,11 +57,9 @@ where pid = #[flowVars.pid];]]>
         <amqp:inbound-endpoint queueName="${broker.queues.recover}" queueDurable="true" responseTimeout="10000" doc:name="restart-failed-generation" connector-ref="broker_connector" exchange-pattern="request-response"/>
         <flow-ref name="setup-related-info" doc:name="setup-related-info"/>
         <db:update config-ref="tracking-db" doc:name="Database">
-            <db:parameterized-query>
-                <![CDATA[update ${database.tracktable}
+            <db:parameterized-query><![CDATA[update ${database.tracktable}
 set status = 'restarting', nr_of_moves = 0, nr_of_moved = 0
-where pid = #[flowVars.pid];]]>
-            </db:parameterized-query>
+where pid = #[flowVars.pid];]]></db:parameterized-query>
         </db:update>
         <dw:transform-message doc:name="Transform Message">
             <dw:set-payload>

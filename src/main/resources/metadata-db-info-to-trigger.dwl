@@ -6,7 +6,13 @@
 	'id': flowVars.row.id,
 	'directory': flowVars.request.basedir, // ++ '/' ++ payload.vol_cote ++ '/' ++ payload.vol_folder_name,
 
-	'fileUse': 'DISK-SHARE-EVENTS',
+	'fileUse': {
+	    'essence': 'TAPE-SHARE-EVENTS',
+	    'browse': 'DISK-SHARE-EVENTS',
+	    'metadata': 'DISK-SHARE-EVENTS',
+	    'video': 'TAPE-SHARE-EVENTS',
+	    'archive': 'TAPE-SHARE-EVENTS'
+	},
 
 	'agents': [{
 		'roles': [ 'CUSTODIAN' ],
@@ -32,7 +38,8 @@
 					'original_carrier_id': { '#text': payload.vol_folder_name },
 					'sp_name': { '#text': 'CEGESOMA' },
 					'PID': { '#text': flowVars.pid },
-					(lookup("organization", payload.instelling)),
+					(lookup("organization", 'Soma')),
+					//(lookup("organization", payload.instelling)),
 					'type': { '#text': 'Paper' },
 					'subject': {
 						'\$type': 'list',
