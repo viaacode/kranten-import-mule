@@ -17,6 +17,18 @@ CREATE TABLE tracktable (
 	nr_of_moved integer DEFAULT 0
 );
 ```
+###Usage
+Place a message on the ingestrequests queue.
+
+example:
+```json
+{
+	"amount": 1,
+	"basedir": "/path/to/directory",
+	"createOriginalZip": false
+}
+```
+
 
 You can restart the generation of a mets file by placing a message on the recover queue.
 This message should contain the pid of a partially generated complex file.
