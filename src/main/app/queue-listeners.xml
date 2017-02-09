@@ -114,15 +114,13 @@ where pid = #[flowVars.pid];]]>
         </dw:transform-message>
         <logger message="data? #[flowVars.data]" level="INFO" doc:name="Logger"/>
         <db:update config-ref="tracking-db" doc:name="update required processing info">
-            <db:parameterized-query>
-                <![CDATA[update ${database.tracktable}
+            <db:parameterized-query><![CDATA[update ${database.tracktable}
 set nr_of_moves = #[
    (flowVars.data['altos'].size () + flowVars.data['tifs'].size () + flowVars.data['jp2s'].size ()) > 0 ?
-        flowVars.data['altos'].size () + flowVars.data['tifs'].size () + flowVars.data['jp2s'].size () + 1
+        flowVars.data['altos'].size () + flowVars.data['tifs'].size () + flowVars.data['jp2s'].size () + (flowVars.request.createOriginalZip ? 1 : 0)
         : 0],
 status = 'queueing-structure'
-where pid = #[flowVars.pid];]]>
-            </db:parameterized-query>
+where pid = #[flowVars.pid];]]></db:parameterized-query>
         </db:update>
         <choice doc:name="Choice">
             <when expression="#[flowVars.data['altos'].size () + flowVars.data['tifs'].size () + flowVars.data['jp2s'].size () &gt; 0]">
@@ -145,12 +143,17 @@ where pid = #[flowVars.pid];]]>
                             <amqp:outbound-endpoint exchangeName="${broker.exchanges.copy_file}" responseTimeout="1000" connector-ref="broker_connector" doc:name="broker.exchanges.copy_file"/>
                         </foreach>
                     </processor-chain>
-                    <processor-chain>
-                        <dw:transform-message doc:name="Transform Message">
-                            <dw:set-payload resource="classpath:structures-extract-oriignal.dwl"/>
-                        </dw:transform-message>
-                        <amqp:outbound-endpoint exchangeName="${broker.exchanges.create_zip}" responseTimeout="10000" connector-ref="broker_connector" doc:name="ask original zip"/>
-                    </processor-chain>
+                    <choice doc:name="Choice">
+                        <when expression="#[flowVars.request.createOriginalZip]">
+                            <dw:transform-message doc:name="Transform Message">
+                                <dw:set-payload resource="classpath:structures-extract-oriignal.dwl"/>
+                            </dw:transform-message>
+                            <amqp:outbound-endpoint exchangeName="${broker.exchanges.create_zip}" responseTimeout="10000" connector-ref="broker_connector" doc:name="ask original zip"/>
+                        </when>
+                        <otherwise>
+                            <logger message="Original zip doesn't have to be created" level="INFO" doc:name="Logger"/>
+                        </otherwise>
+                    </choice>
                     <processor-chain>
                         <dw:transform-message doc:name="Transform Message">
                             <dw:set-payload>

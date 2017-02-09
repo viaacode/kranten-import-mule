@@ -5,7 +5,6 @@
 	'pid': flowVars.pid,
 	'id': flowVars.row.id,
 	'directory': flowVars.request.basedir, // ++ '/' ++ payload.vol_cote ++ '/' ++ payload.vol_folder_name,
-
 	'fileUse': {
 	    'essence': 'TAPE-SHARE-EVENTS',
 	    'browse': 'DISK-SHARE-EVENTS',
@@ -13,7 +12,7 @@
 	    'video': 'TAPE-SHARE-EVENTS',
 	    'archive': 'TAPE-SHARE-EVENTS'
 	},
-
+	'createOriginalZip': flowVars.request.createOriginalZip,
 	'agents': [{
 		'roles': [ 'CUSTODIAN' ],
 		'type': 'ORGANIZATION',
