@@ -37,8 +37,8 @@
 					'original_carrier_id': { '#text': payload.vol_folder_name },
 					'sp_name': { '#text': 'CEGESOMA' },
 					'PID': { '#text': flowVars.pid },
-					(lookup("organization", 'Soma')),
-					//(lookup("organization", payload.instelling)),
+					//(lookup("organization", 'Soma')),
+					(lookup("organization", payload.instelling)),
 					'type': { '#text': 'Paper' },
 					'subject': {
 						'\$type': 'list',

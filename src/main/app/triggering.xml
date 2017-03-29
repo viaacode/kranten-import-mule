@@ -192,7 +192,7 @@ where id = #[flowVars.row.id];]]></db:parameterized-query>
 %output application/java
 ---
 [
-	'CP': { '#text': 'Koninklijk Museum van het Leger en de Krijgsgeschiedenis' },
+	'CP': { '#text': 'Koninklijk Museum van het Leger' },
 	'OR_id': { '#text': 'OR-6d5p979' }
 ]]]></dw:set-payload>
                 </dw:transform-message>
