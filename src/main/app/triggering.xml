@@ -28,48 +28,49 @@ http://www.springframework.org/schema/beans http://www.springframework.org/schem
 		<http:listener config-ref="HTTP_Listener_Configuration" path="/" allowedMethods="POST" doc:name="HTTP"/>
         <flow-ref name="initiate_import_flow" doc:name="initiate_import_flow"/>
 	</flow>
-    <flow name="triggeringFlow1">
-        <amqp:inbound-endpoint
-			queueName="${broker.queues.ingestrequests}"
-			queueDurable="true"
-			exchange-pattern="request-response"
-			connector-ref="broker_connector"
-			doc:name="Get message from Export queue" responseTimeout="10000"/>
-        <flow-ref name="initiate_import_flow" doc:name="Flow Reference"/>
+    <flow name="triggeringFlow1" initialState="started">
+        <amqp:inbound-endpoint queueName="${broker.queues.ingestrequests}" queueDurable="true" responseTimeout="10000" connector-ref="broker_connector" doc:name="Get message from Export queue"/>
+        <flow-ref name="initiate_import_flow" doc:name="initiate_import_flow"/>
+        <amqp:acknowledge-message doc:name="AMQP-0-9 Acknowledge Message"/>
     </flow>
     <sub-flow name="initiate_import_flow">
     	<json:json-to-object-transformer returnClass="java.util.HashMap" doc:name="JSON to Object"/>
-		<set-variable variableName="request" value="#[payload]" doc:name="Variable"/>
-        <db:select config-ref="metadata_db" doc:name="Database">
-            <db:parameterized-query><![CDATA[select count(*) != 0 as in_progress from ${metadatadb.table} where status = 'in_progress';]]></db:parameterized-query>
-        </db:select>
-		<logger message="in progress?? =&gt; #[payload[0].in_progress]" level="INFO" doc:name="Logger"/>
-		<choice doc:name="Choice">
-			<when expression="#[! payload[0].in_progress]">
-                <db:update config-ref="metadata_db" doc:name="mark for processing">
-                    <db:parameterized-query><![CDATA[update ${metadatadb.table} as o
+		<set-variable variableName="request" value="#[payload]" doc:name="Variable"/><db:update config-ref="metadata_db" doc:name="mark for processing">
+                    <db:parameterized-query><![CDATA[update ${metadatadb.table}
 set status = 'in_progress'
-from (select id from ${metadatadb.table} where status = 'initialized' or status = 'init' limit #[flowVars.request.amount]) as s
-where o.id = s.id;]]></db:parameterized-query>
+WHERE id = #[flowVars.request.id]]]></db:parameterized-query>
                 </db:update>
 				<db:select config-ref="metadata_db" doc:name="select for processing">
-                    <db:parameterized-query><![CDATA[SELECT * FROM (select
-gazetten.id, gazetten.viaa_pid, gazetten.vol_id, gazetten.tit_id, corrections.vol_cote, gazetten.vol_additional_cote, gazetten.vol_unique_num, corrections.vol_folder_name,
-gazetten.titre, gazetten.opm, gazetten.dag, gazetten.instelling, gazetten.dagen, gazetten.plaatsingsnummer, gazetten.fz, gazetten.datum,
-gazetten.datum_clean, gazetten.dor, gazetten.jaar, gazetten.maand, gazetten.annex, gazetten.oorlog, gazetten.nr_guide, gazetten.gevonden, gazetten.verschenen,
-gazetten.gescand, gazetten.plaats_van_uitgave, gazetten.extra, gazetten.minder, gazetten.type
-from ${metadatadb.table} gazetten
-LEFT JOIN corrections
-ON gazetten.id = corrections.gazet_fk
-WHERE corrections.verified = true
-AND gazetten.status = 'in_progress') temp LIMIT 1;]]></db:parameterized-query>
+            <db:parameterized-query><![CDATA[SELECT
+    gazetten.id, gazetten.viaa_pid, gazetten.vol_id, gazetten.tit_id, corrections.vol_cote, gazetten.vol_additional_cote, gazetten.vol_unique_num, corrections.vol_folder_name,
+    gazetten.titre, gazetten.opm, gazetten.dag, gazetten.instelling, gazetten.dagen, gazetten.plaatsingsnummer, gazetten.fz, gazetten.datum,
+    gazetten.datum_clean, gazetten.dor, gazetten.jaar, gazetten.maand, gazetten.annex, gazetten.oorlog, gazetten.nr_guide, gazetten.gevonden, gazetten.verschenen,
+    gazetten.gescand, gazetten.plaats_van_uitgave, gazetten.extra, gazetten.minder, gazetten.type
+FROM
+	gazetten gazetten
+LEFT JOIN
+	corrections corrections
+ON
+	corrections.gazet_fk = gazetten.id
+AND
+	corrections.file_count > 0
+WHERE corrections.vol_cote IS NOT NULL AND corrections.vol_folder_name IS NOT NULL
+AND gazetten.id = #[flowVars.request.id]
+LIMIT 1;]]></db:parameterized-query>
 				</db:select>
 		<collection-splitter doc:name="Collection Splitter"/>
 				<set-variable variableName="row" value="#[payload]" doc:name="keep db entry"/>
-		<enricher   doc:name="set pid">
-			<flow-ref name="pid-id" doc:name="pid-id"/>
-					<enrich source="payload" target="flowVars.pid"/>
-		</enricher>
+        <choice doc:name="Do we need to generate a pid?">
+            <when expression="#[flowVars.row.viaa_pid == null || flowVars.row.viaa_pid.toString().isEmpty()]">
+                <enricher doc:name="set pid">
+                    <flow-ref name="pid-id" doc:name="pid-id"/>
+                    <enrich source="payload" target="flowVars.pid"/>
+                </enricher>
+            </when>
+            <otherwise>
+                <set-variable variableName="pid" value="#[flowVars.row.viaa_pid]" doc:name="Set pid"/>
+            </otherwise>
+        </choice>
 		<dw:transform-message doc:name="Transform Message">
 			<dw:set-payload resource="classpath:metadata-db-info-to-trigger.dwl"/>
                     <dw:set-variable variableName="instelling"><![CDATA[%dw 1.0
@@ -90,21 +91,6 @@ where id = #[flowVars.row.id];]]></db:parameterized-query>
                     </db:update>
 				</enricher>
 		<collection-aggregator failOnTimeout="true" doc:name="Collection Aggregator"/>
-			</when>
-			<otherwise>
-				<logger message="previous run still in progress." level="INFO" doc:name="Logger"/>
-				<dw:transform-message doc:name="Transform Message">
-					<dw:set-payload><![CDATA[%dw 1.0
-%output application/java
----
-{
-	'success': false,
-	'msg': 'no actions performed, previous call still in progress.'
-}]]></dw:set-payload>
-				</dw:transform-message>
-			</otherwise>
-		</choice>
-		<json:object-to-json-transformer doc:name="Object to JSON"/>
     </sub-flow>
 
 	<flow name="uuid-id">
@@ -120,7 +106,7 @@ where id = #[flowVars.row.id];]]></db:parameterized-query>
 ---
 [
 	'CP': { '#text': 'CEGESOMA' },
-	'OR_id': { '#text': 'OR-fx73x4x' }
+	'CP_id': { '#text': 'OR-fx73x4x' }
 ]]]></dw:set-payload>
                 </dw:transform-message>
             </when>
@@ -132,7 +118,7 @@ where id = #[flowVars.row.id];]]></db:parameterized-query>
 ---
 [
 	'CP': { '#text': 'Provinciale Bibliotheek Limburg' },
-	'OR_id': { '#text': 'OR-z31nn3s' }
+	'CP_id': { '#text': 'OR-z31nn3s' }
 ]]]></dw:set-payload>
                 </dw:transform-message>
             </when>
@@ -144,8 +130,8 @@ where id = #[flowVars.row.id];]]></db:parameterized-query>
 ---
 [
 	'CP': { '#text': 'UGent' },
-	'OR_id': { '#text': 'OR-0z70w1b' },
-	'Sub_CP': { '#text': 'universiteitsbibliotheek' }
+	'CP_id': { '#text': 'OR-0z70w1b' },
+	'Sub_CP': { '#text': 'UGent Boekentoren' }
 ]]]></dw:set-payload>
                 </dw:transform-message>
             </when>
@@ -157,7 +143,7 @@ where id = #[flowVars.row.id];]]></db:parameterized-query>
 ---
 [
 	'CP': { '#text': 'Stadsbibliotheek Kortrijk' },
-	'OR_id': { '#text': 'OR-kk94b7d' }
+	'CP_id': { '#text': 'OR-kk94b7d' }
 ]]]></dw:set-payload>
                 </dw:transform-message>
             </when>
@@ -169,7 +155,7 @@ where id = #[flowVars.row.id];]]></db:parameterized-query>
 ---
 [
 	'CP': { '#text': 'Algemeen Rijksarchief' },
-	'OR_id': { '#text': 'OR-fx73x54' }
+	'CP_id': { '#text': 'OR-fx73x54' }
 ]]]></dw:set-payload>
                 </dw:transform-message>
             </when>
@@ -181,7 +167,7 @@ where id = #[flowVars.row.id];]]></db:parameterized-query>
 ---
 [
 	'CP': { '#text': 'Koninklijke Bibliotheek' },
-	'OR_id': { '#text': 'OR-b56d422' }
+	'CP_id': { '#text': 'OR-b56d422' }
 ]]]></dw:set-payload>
                 </dw:transform-message>
             </when>
@@ -193,7 +179,7 @@ where id = #[flowVars.row.id];]]></db:parameterized-query>
 ---
 [
 	'CP': { '#text': 'Koninklijk Museum van het Leger' },
-	'OR_id': { '#text': 'OR-6d5p979' }
+	'CP_id': { '#text': 'OR-6d5p979' }
 ]]]></dw:set-payload>
                 </dw:transform-message>
             </when>
@@ -205,7 +191,7 @@ where id = #[flowVars.row.id];]]></db:parameterized-query>
 ---
 [
 	'CP': { '#text': 'Erfgoedbibliotheek Hendrik Conscience' },
-	'OR_id': { '#text': 'OR-v97zq9j' }
+	'CP_id': { '#text': 'OR-v97zq9j' }
 ]]]></dw:set-payload>
                 </dw:transform-message>
             </when>

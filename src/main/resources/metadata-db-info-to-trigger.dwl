@@ -3,8 +3,8 @@
 ---
 {
 	'pid': flowVars.pid,
-	'id': flowVars.row.id,
-	'directory': flowVars.request.basedir, // ++ '/' ++ payload.vol_cote ++ '/' ++ payload.vol_folder_name,
+	'id': flowVars.request.id,
+	'directory': p('sourcefiles.basepath') ++ payload.vol_cote ++ '/' ++ payload.vol_folder_name,
 	'fileUse': {
 	    'essence': 'TAPE-SHARE-EVENTS',
 	    'browse': 'DISK-SHARE-EVENTS',
@@ -28,25 +28,27 @@
 			'MediaHAVEN_external_metadata': {
 				'title': { '#text': payload.titre },
 				'MDProperties': {
+					//(lookup("organization", 'Soma')),
+					(lookup("organization", payload.instelling)),
+					'sp_name': { '#text': 'CEGESOMA' },
+					'PID': { '#text': flowVars.pid },
+					'dc_identifier_localid': { '#text': payload.vol_folder_name },
+					//'dc_title': { '#text': payload.titre },
 					'dc_titles': {
 						'\$type': 'list',
 						'archief': { '#text': 'OORLOG' },
 						'deelarchief': { '#text': payload.type }
 					},
-					'date': { '#text': (payload.datum_clean replace 'x' with 'u') },
-					'original_carrier_id': { '#text': payload.vol_folder_name },
-					'sp_name': { '#text': 'CEGESOMA' },
-					'PID': { '#text': flowVars.pid },
-					//(lookup("organization", 'Soma')),
-					(lookup("organization", payload.instelling)),
-					'type': { '#text': 'Paper' },
-					'subject': {
+					'dcterms_created': { '#text': (payload.datum_clean replace 'x' with 'u') },
+					'dcterms_issued': { '#text': (payload.datum_clean replace 'x' with 'u') },
+					'dc_subjects': {
 						'\$type': 'list',
-						subject: { '#text': payload.oorlog }
+						Trefwoord: { '#text': payload.oorlog }
 					},
-
-					placeoforigin: { "#text": payload.plaats_van_uitgave },
-					carrier_date: { '#text': payload.datum_clean }
+					'dc_coverages': {
+						'\$type': 'list',
+						ruimte: { '#text': payload.plaats_van_uitgave }
+					}
 				}
 			}
 		}
