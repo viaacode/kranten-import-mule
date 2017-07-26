@@ -47,7 +47,8 @@
 					},
 					'dc_coverages': {
 						'\$type': 'list',
-						ruimte: { '#text': payload.plaats_van_uitgave }
+						ruimte: { '#text': payload.plaats_van_uitgave },
+						tijd: { '#text': payload.oorlog }
 					}
 				}
 			}
