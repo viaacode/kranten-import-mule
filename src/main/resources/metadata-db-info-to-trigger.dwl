@@ -41,6 +41,7 @@
 					},
 					'dcterms_created': { '#text': (payload.datum_clean replace 'x' with 'u') },
 					'dcterms_issued': { '#text': (payload.datum_clean replace 'x' with 'u') },
+					'date': { '#text': (payload.datum_clean replace 'x' with 'u') },
 					'dc_subjects': {
 						'\$type': 'list',
 						Trefwoord: { '#text': payload.oorlog }
