@@ -28,20 +28,24 @@ http://www.springframework.org/schema/beans http://www.springframework.org/schem
 		<http:listener config-ref="HTTP_Listener_Configuration" path="/" allowedMethods="POST" doc:name="HTTP"/>
         <flow-ref name="initiate_import_flow" doc:name="initiate_import_flow"/>
 	</flow>
-    <flow name="triggeringFlow1" initialState="started">
-        <amqp:inbound-endpoint queueName="${broker.queues.ingestrequests}" queueDurable="true" responseTimeout="10000" connector-ref="broker_connector" doc:name="Get message from Export queue"/>
+    <flow name="triggeringFlow1" initialState="started" processingStrategy="synchronous">
+        <amqp:inbound-endpoint queueName="${broker.queues.ingestrequests}" queueDurable="true" responseTimeout="10000" connector-ref="broker_connector" doc:name="Get message from ingestrequests queue"/>
         <flow-ref name="initiate_import_flow" doc:name="initiate_import_flow"/>
         <amqp:acknowledge-message doc:name="AMQP-0-9 Acknowledge Message"/>
     </flow>
     <sub-flow name="initiate_import_flow">
     	<json:json-to-object-transformer returnClass="java.util.HashMap" doc:name="JSON to Object"/>
-		<set-variable variableName="request" value="#[payload]" doc:name="Variable"/><db:update config-ref="metadata_db" doc:name="mark for processing">
-                    <db:parameterized-query><![CDATA[update ${metadatadb.table}
+		<set-variable variableName="request" value="#[payload]" doc:name="Variable"/>
+        <enricher target="#[payload]" doc:name="Message Enricher">
+            <db:update config-ref="metadata_db" doc:name="mark for processing">
+                <db:parameterized-query><![CDATA[update ${metadatadb.table}
 set status = 'in_progress'
 WHERE id = #[flowVars.request.id]]]></db:parameterized-query>
-                </db:update>
-				<db:select config-ref="metadata_db" doc:name="select for processing">
-            <db:parameterized-query><![CDATA[SELECT
+            </db:update>
+        </enricher>
+        <enricher target="#[payload]" doc:name="Message Enricher">
+            <db:select config-ref="metadata_db" doc:name="select for processing">
+                <db:parameterized-query><![CDATA[SELECT
     gazetten.id, gazetten.viaa_pid, gazetten.vol_id, gazetten.tit_id, corrections.vol_cote, gazetten.vol_additional_cote, gazetten.vol_unique_num, corrections.vol_folder_name,
     gazetten.titre, gazetten.opm, gazetten.dag, gazetten.instelling, gazetten.dagen, gazetten.plaatsingsnummer, gazetten.fz, gazetten.datum,
     gazetten.datum_clean, gazetten.dor, gazetten.jaar, gazetten.maand, gazetten.annex, gazetten.oorlog, gazetten.nr_guide, gazetten.gevonden, gazetten.verschenen,
@@ -57,40 +61,41 @@ AND
 WHERE corrections.vol_cote IS NOT NULL AND corrections.vol_folder_name IS NOT NULL
 AND gazetten.id = #[flowVars.request.id]
 LIMIT 1;]]></db:parameterized-query>
-				</db:select>
-		<collection-splitter doc:name="Collection Splitter"/>
-				<set-variable variableName="row" value="#[payload]" doc:name="keep db entry"/>
-        <choice doc:name="Do we need to generate a pid?">
-            <when expression="#[flowVars.row.viaa_pid == null || flowVars.row.viaa_pid.toString().isEmpty()]">
-                <enricher doc:name="set pid">
-                    <flow-ref name="pid-id" doc:name="pid-id"/>
-                    <enrich source="payload" target="flowVars.pid"/>
-                </enricher>
-            </when>
-            <otherwise>
-                <set-variable variableName="pid" value="#[flowVars.row.viaa_pid]" doc:name="Set pid"/>
-            </otherwise>
-        </choice>
-		<dw:transform-message doc:name="Transform Message">
-			<dw:set-payload resource="classpath:metadata-db-info-to-trigger.dwl"/>
-                    <dw:set-variable variableName="instelling"><![CDATA[%dw 1.0
+            </db:select>
+        </enricher>
+        <foreach doc:name="For Each">
+            <set-variable variableName="row" value="#[payload]" doc:name="keep db entry"/>
+            <choice doc:name="Do we need to generate a pid?">
+                <when expression="#[flowVars.row.viaa_pid == null || flowVars.row.viaa_pid.toString().isEmpty()]">
+                    <enricher doc:name="set pid">
+                        <flow-ref name="pid-id" doc:name="pid-id"/>
+                        <enrich source="payload" target="flowVars.pid"/>
+                    </enricher>
+                </when>
+                <otherwise>
+                    <set-variable variableName="pid" value="#[flowVars.row.viaa_pid]" doc:name="Set pid"/>
+                </otherwise>
+            </choice>
+            <dw:transform-message doc:name="Transform Message">
+                <dw:set-payload resource="classpath:metadata-db-info-to-trigger.dwl"/>
+                <dw:set-variable variableName="instelling"><![CDATA[%dw 1.0
 %output application/java
 ---
 payload.instelling]]></dw:set-variable>
-		</dw:transform-message>
-				<json:object-to-json-transformer doc:name="Object to JSON"/>
-				<enricher source="payload" target="flowVars.ignored" doc:name="Message Enricher">
-					<amqp:outbound-endpoint queueName="${broker.queues.trigger}" responseTimeout="10000" connector-ref="broker_connector" doc:name="broker.queues.trigger"/>
-				</enricher>
-				<json:json-to-object-transformer returnClass="java.util.HashMap" doc:name="JSON to Object"/>
-				<enricher source="payload" target="flowVars.updated" doc:name="Message Enricher">
-                    <db:update config-ref="metadata_db" doc:name="Database">
-                        <db:parameterized-query><![CDATA[update ${metadatadb.table}
+            </dw:transform-message>
+            <json:object-to-json-transformer doc:name="Object to JSON"/>
+            <enricher source="payload" target="flowVars.ignored" doc:name="Message Enricher">
+                <amqp:outbound-endpoint queueName="${broker.queues.trigger}" responseTimeout="10000" connector-ref="broker_connector" doc:name="broker.queues.trigger"/>
+            </enricher>
+            <json:json-to-object-transformer returnClass="java.util.HashMap" doc:name="JSON to Object"/>
+            <enricher source="payload" target="flowVars.updated" doc:name="Message Enricher">
+                <db:update config-ref="metadata_db" doc:name="Database">
+                    <db:parameterized-query><![CDATA[update ${metadatadb.table}
 set status = 'delivered', viaa_pid=#[flowVars.pid]
 where id = #[flowVars.row.id];]]></db:parameterized-query>
-                    </db:update>
-				</enricher>
-		<collection-aggregator failOnTimeout="true" doc:name="Collection Aggregator"/>
+                </db:update>
+            </enricher>
+        </foreach>
     </sub-flow>
 
 	<flow name="uuid-id">
