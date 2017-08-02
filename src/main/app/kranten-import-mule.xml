@@ -25,7 +25,7 @@ http://www.springframework.org/schema/context http://www.springframework.org/sch
 	</amqp:connector>
 	
 	
-	<amqp:connector name="broker_connector" validateConnections="true" doc:name="AMQP-0-9 Connector" host="${broker.host}" password="${broker.password}" port="${broker.port}" username="${broker.username}" ackMode="MULE_AUTO" prefetchCount="1" virtualHost="${broker.vhost}">
+	<amqp:connector name="broker_connector" validateConnections="true" doc:name="AMQP-0-9 Connector" host="${broker.host}" password="${broker.password}" port="${broker.port}" username="${broker.username}" ackMode="MANUAL" prefetchCount="1" virtualHost="${broker.vhost}">
 		<reconnect frequency="5000" count="25"></reconnect>  
 	</amqp:connector>
 	
