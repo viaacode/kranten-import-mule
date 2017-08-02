@@ -263,7 +263,9 @@ where pid = #[flowVars.pid];]]>
 }]]>
                     </dw:set-payload>
                 </dw:transform-message>
+                
                 <amqp:outbound-endpoint responseTimeout="10000" doc:name="request hand off to mam system" exchangeName="${broker.exchanges.hand_off}" connector-ref="handoff_connector"/>
+                
                 <db:update config-ref="tracking-db" doc:name="Database">
                     <db:parameterized-query>
                         <![CDATA[update ${database.tracktable}

@@ -97,7 +97,7 @@ return payload.get (0).get ('data');
         <choice doc:name="Choice">
             <when expression="#[flowVars.pid != null]">
                 <choice doc:name="Is TIFF corrupt?">
-                    <when expression="#[flowVars.data.details.contains(&quot;Cannot read TIFF header&quot;) || flowVars.data.details.contains(&quot;Not enough data at scanline&quot;) || flowVars.data.details.contains(&quot;Sanity check on directory count failed&quot;)]">
+                    <when expression="#[flowVars.data.details.contains(&quot;Cannot read TIFF header&quot;) || flowVars.data.details.contains(&quot;Not enough data at scanline&quot;) || flowVars.data.details.contains(&quot;Sanity check on directory count failed&quot;)  || flowVars.data.details.contains(&quot;Not enough data for scanline&quot;)]">
                         <db:update config-ref="tracking-db" doc:name="Database">
                             <db:parameterized-query><![CDATA[UPDATE tracktable SET status = 'corrupted' WHERE pid = #[flowVars.pid];]]></db:parameterized-query>
                         </db:update>
