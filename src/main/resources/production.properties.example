@@ -3,20 +3,26 @@ database.username=
 database.tracktable=
 database.db=
 database.host=
-# database.host=
-database.url=jdbc:postgresql://${database.host}/${database.db}?user=${database.username}&password=${database.password}
+database.url=jdbc:postgresql://${database.host}/${database.db}?user=${database.username}&password=
 
 metadatadb.password=
 metadatadb.username=
 metadatadb.table=
 metadatadb.db=
 metadatadb.host=
-metadatadb.url=jdbc:postgresql://${metadatadb.host}/${metadatadb.db}?user=${metadatadb.username}&password=${metadatadb.password}
+metadatadb.url=jdbc:postgresql://${metadatadb.host}/${metadatadb.db}?user=${metadatadb.username}&password=
 
 broker.host=
 broker.port=
 broker.username=
 broker.password=
+broker.vhost=
+
+broker.handoff.host=
+broker.handoff.port=
+broker.handoff.username=
+broker.handoff.password=
+broker.handoff.vhost=
 
 broker.queues.ingestrequests=
 broker.queues.trigger=
@@ -50,6 +56,22 @@ ftpsource.cegesoma.host=
 ftpsource.cegesoma.username=
 ftpsource.cegesoma.password=
 
+ftpDestination.inuits.host=
+ftpDestination.inuits.username=
+ftpDestination.inuits.password=
+ftpDestination.inuits.path=
 
+pidservice.host=
+pidservice.port=
+pidservice.path=
+
+sourcefiles.basepath=
 private_dir=
 hosted_at=
+
+sensor.host=
+sensor.path=
+sensor.id=
+sensor.username=
+sensor.password=
+sensor.maxinprogress=
