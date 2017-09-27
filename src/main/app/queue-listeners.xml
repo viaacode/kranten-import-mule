@@ -423,7 +423,7 @@ where pid = #[flowVars.pid];]]>
             </http:request-builder>
         </http:request>
         <mulexml:dom-to-xml-transformer doc:name="DOM to XML"/>
-        <set-variable variableName="in_progress" value="#[java.lang.Integer.parseInt(xpath3(&quot;//channels/item[name='Value']/lastvalue/text()&quot;).split(' #')[0])]" doc:name="Set in_progress"/>
+        <set-variable variableName="in_progress" value="#[java.lang.Integer.parseInt(xpath3(&quot;//channels/item[name='Value']/lastvalue/text()&quot;).split(' #')[0].replaceAll(' ',''))]" doc:name="Set in_progress"/>
         <logger message="#[&quot;Amount in progress: &quot; + flowVars.in_progress]" level="INFO" doc:name="Logger"/>
         <message-filter throwOnUnaccepted="true" doc:name="Message">
             <expression-filter expression="#[flowVars.in_progress &lt; '${sensor.maxinprogress}']"/>
