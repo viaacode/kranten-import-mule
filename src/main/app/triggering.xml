@@ -26,14 +26,14 @@ http://www.springframework.org/schema/beans http://www.springframework.org/schem
 
 	<flow name="triggeringFlow">
 		<http:listener config-ref="HTTP_Listener_Configuration" path="/" allowedMethods="POST" doc:name="HTTP"/>
-        <flow-ref name="initiate_import_flow" doc:name="initiate_import_flow"/>
+        <flow-ref name="initiate_import_flow_cegesoma" doc:name="initiate_import_flow_cegesoma"/>
 	</flow>
     <flow name="triggeringFlow1" initialState="started" processingStrategy="synchronous">
         <amqp:inbound-endpoint queueName="${broker.queues.ingestrequests}" queueDurable="true" responseTimeout="10000" connector-ref="broker_connector" doc:name="Get message from ingestrequests queue"/>
-        <flow-ref name="initiate_import_flow" doc:name="initiate_import_flow"/>
+        <flow-ref name="initiate_import_flow_cegesoma" doc:name="initiate_import_flow_cegesoma"/>
         <amqp:acknowledge-message doc:name="AMQP-0-9 Acknowledge Message"/>
     </flow>
-    <sub-flow name="initiate_import_flow">
+    <sub-flow name="initiate_import_flow_cegesoma">
     	<json:json-to-object-transformer returnClass="java.util.HashMap" doc:name="JSON to Object"/>
 		<set-variable variableName="request" value="#[payload]" doc:name="Variable"/>
         <enricher target="#[payload]" doc:name="Message Enricher">
