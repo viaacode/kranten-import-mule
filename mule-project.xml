@@ -2,5 +2,4 @@
 <mule-project xmlns="http://www.mulesoft.com/tooling/project" runtimeId="org.mule.tooling.server.3.7.4.ee" schemaVersion="5.3.0.0">
     <name>kranten-import-mule</name>
     <description></description>
-    <muleExtension name="AMQP-0-9" qualifier="mule-transport-amqp-contribution"/>
 </mule-project>

@@ -47,7 +47,7 @@ return payload.get (0).get ('data');
 	-->
 	<sub-flow name="setup-related-info">
 				<json:json-to-object-transformer returnClass="java.util.HashMap" doc:name="JSON to Object"/>
-		<set-variable variableName="pid" value="#[payload['correlation_id'] == null ? payload['pid'] : payload['correlation_id'] ]" doc:name="keep pid"/>
+		<set-variable variableName="pid" value="#[payload['pid'] == null ? payload['correlation_id'] : payload['pid'] ]" doc:name="keep pid"/>
 		<set-variable variableName="data" value="#[payload]" doc:name="keep payload data"/>
 		<scripting:component doc:name="Groovy">
 			<scripting:script engine="Groovy"><![CDATA[import be.viaa.exceptions.StepFailedException;

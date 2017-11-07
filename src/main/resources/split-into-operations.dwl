@@ -9,5 +9,8 @@
 		('$$': $ replace 'tif' with 'jp2') when (('$$' contains 'destination') and ($ != null)),
 		'destination_server': host,
 		'extra_options': '-no_palette'
-	})
+	}),
+	'pdfs': payload filter $.type == 'pdf',
+	'mets': payload filter $.type == 'original_mets',
+	'jpgs': payload filter $.type == 'jpg'
 }
