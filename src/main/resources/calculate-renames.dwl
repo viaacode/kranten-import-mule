@@ -5,8 +5,8 @@
 %var filename = (path) -> (path match /(.*\/)?([^\/]*)/)[2]
 %var basepath = (path) -> '' when not (path contains '/') otherwise (path match /(.*)\/[^\/]*/)[1]
 %var destinationPath = (original, type) -> flowVars.request.directory ++ '/_complex/' ++ type
-%var destinationName = (original, type, ext) -> flowVars.pid ++ '_' ++ flowVars.mets_date ++ '_' ++ getPageNumber(original) ++ '_' ++ type ++ '.' ++ ext
-%var destinationNameMets = (original, type, ext) -> flowVars.pid ++ '_' ++ flowVars.mets_date ++ '_' ++ type ++ '.' ++ ext
+%var destinationName = (original, type, ext) -> flowVars.pid ++ '_' ++ getPageNumber(original) ++ '_' ++ type ++ '.' ++ ext
+%var destinationNameMets = (original, type, ext) -> flowVars.pid ++ '_' ++ type ++ '.' ++ ext
 ---
 flowVars.data.files map using
 (type = 'tif' when (lower $ contains 'tif') 

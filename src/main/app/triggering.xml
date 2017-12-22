@@ -21,13 +21,7 @@ http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/jso
 http://www.mulesoft.org/schema/mule/scripting http://www.mulesoft.org/schema/mule/scripting/current/mule-scripting.xsd
 http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd">
 
-	<http:listener-config name="HTTP_Listener_Configuration" host="0.0.0.0" port="8081" doc:name="HTTP Listener Configuration"/>
 	<http:request-config name="pid-generator" host="${pidservice.host}" port="${pidservice.port}" basePath="/" doc:name="HTTP Request Configuration"/>
-
-	<flow name="triggeringFlow">
-		<http:listener config-ref="HTTP_Listener_Configuration" path="/" allowedMethods="POST" doc:name="HTTP"/>
-        <flow-ref name="initiate_import_flow" doc:name="initiate_import_flow"/>
-	</flow>
     <flow name="triggeringFlow1" initialState="started" processingStrategy="synchronous">
         <amqp:inbound-endpoint queueName="${broker.queues.ingestrequests}" queueDurable="true" responseTimeout="10000" connector-ref="broker_connector" doc:name="Get message from ingestrequests queue"/>
         <flow-ref name="initiate_import_flow" doc:name="initiate_import_flow"/>

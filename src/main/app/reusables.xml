@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<mule xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking"
+<mule xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking"
 	xmlns="http://www.mulesoft.org/schema/mule/core"
 	xmlns:amqp="http://www.mulesoft.org/schema/mule/amqp"
 	xmlns:db="http://www.mulesoft.org/schema/mule/db"
@@ -63,7 +63,7 @@ return payload.get (0).get ('data');
 ]]></scripting:script>
 		</scripting:component>
         <json:json-to-object-transformer returnClass="java.util.HashMap" doc:name="JSON to Object"/>
-		<set-variable variableName="request" value="#[payload]" doc:name="keep pid related data"/>
+		<set-variable variableName="request" value="#[payload]" doc:name="keep pid related data (Set request)"/>
 	</sub-flow>
 
 	<sub-flow name="log">

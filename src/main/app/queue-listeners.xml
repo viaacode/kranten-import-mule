@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<mule xmlns:mulexml="http://www.mulesoft.org/schema/mule/xml" xmlns="http://www.mulesoft.org/schema/mule/core" 
+<mule xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:mulexml="http://www.mulesoft.org/schema/mule/xml" xmlns="http://www.mulesoft.org/schema/mule/core" 
     xmlns:amqp="http://www.mulesoft.org/schema/mule/amqp" 
     xmlns:db="http://www.mulesoft.org/schema/mule/db" 
     xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" 
@@ -31,12 +31,14 @@ http://www.mulesoft.org/schema/mule/xml http://www.mulesoft.org/schema/mule/xml/
         <set-variable variableName="id" value="#[payload['id']]" doc:name="Set id"/>
         <set-variable variableName="request" value="#[payload]" doc:name="keep request"/>
         <db:select config-ref="tracking-db" doc:name="Get potentially existing row from database">
-            <db:parameterized-query><![CDATA[SELECT * FROM tracktable WHERE gazet_fk = #[flowVars.id];]]></db:parameterized-query>
+            <db:parameterized-query><![CDATA[SELECT * FROM tracktable WHERE gazet_fk = #[flowVars.id] or pid = #[flowVars.id];]]></db:parameterized-query>
         </db:select>
         <choice doc:name="Update existing or insert new?">
             <when expression="#[payload.size() &gt; 0]">
                 <db:update config-ref="tracking-db" doc:name="Update existing">
-                    <db:parameterized-query><![CDATA[UPDATE tracktable SET pid = #[flowVars.pid], status = 'initialized', data = #[flowVars.json], nr_of_moves = 0, nr_of_moved = 0 WHERE gazet_fk = #[flowVars.id];]]></db:parameterized-query>
+                    <db:parameterized-query><![CDATA[UPDATE tracktable 
+SET pid = #[flowVars.pid], status = 'initialized', data = #[flowVars.json], nr_of_moves = 0, nr_of_moved = 0
+WHERE gazet_fk = #[flowVars.id];]]></db:parameterized-query>
                 </db:update>
             </when>
             <otherwise>
@@ -123,16 +125,6 @@ where pid = #[flowVars.pid];]]>
     <flow name="list-directories-completed">
         <amqp:inbound-endpoint queueName="${broker.queues.directorylist}" responseTimeout="10000" doc:name="list-directories-completed (kranten_listing_complete)" connector-ref="broker_connector" />
         <flow-ref name="setup-related-info" doc:name="setup-related-info"/>
-        <foreach collection="#[flowVars.data.files]" doc:name="For Each file">
-            <choice doc:name="Choice">
-                <when expression="#[!payload.contains('/') &amp;&amp; payload.contains('xml')]">
-                    <set-variable variableName="mets_date" value="#[payload.replaceAll('.*_([0-9]*).*', &quot;$1&quot;)]" doc:name="Set mets_date"/>
-                </when>
-                <otherwise>
-                    <expression-component doc:name="Expression"><![CDATA[// do nothing]]></expression-component>
-                </otherwise>
-            </choice>
-        </foreach>
         <dw:transform-message doc:name="calculate renames">
             <dw:set-payload resource="classpath:calculate-renames.dwl"/>
         </dw:transform-message>
@@ -266,7 +258,8 @@ where pid = #[flowVars.pid]]]></db:parameterized-query>
         </transactional>
         <choice doc:name="is pid structure complete?">
             <when expression="#[payload[0].completed]">
-                <dw:transform-message doc:name="Transform Message">
+                <dw:transform-message doc:name="Transform Message" metadata:id="375b976c-675c-4603-9413-b5c0f3096c66">
+                    <dw:input-variable doc:sample="sample_data/json_1.json" variableName="metadata"/>
                     <dw:set-payload>
                         <![CDATA[%dw 1.0
 %output application/json
@@ -282,6 +275,7 @@ where pid = #[flowVars.pid]]]></db:parameterized-query>
 }]]>
                     </dw:set-payload>
                 </dw:transform-message>
+                <byte-array-to-string-transformer doc:name="Byte Array to String"/>
                 <amqp:outbound-endpoint responseTimeout="10000" doc:name="request mets generation" exchangeName="${broker.exchanges.generate_mets}" connector-ref="broker_connector"/>
                 <db:update config-ref="tracking-db" doc:name="Database">
                     <db:parameterized-query>
@@ -317,36 +311,6 @@ where pid = #[flowVars.pid];]]>
                 <amqp:outbound-endpoint responseTimeout="10000" doc:name="request hand off to mam system" exchangeName="${broker.exchanges.hand_off}" connector-ref="handoff_connector"/>
                 <flow-ref name="while_amount_in_progress_free" doc:name="while_amount_in_progress_free"/>
                 
-                <db:update config-ref="tracking-db" doc:name="Database">
-                    <db:parameterized-query>
-                        <![CDATA[update ${database.tracktable}
-set status = 'handing off'
-where pid = #[flowVars.pid];]]>
-                    </db:parameterized-query>
-                </db:update>
-            </when>
-            <when expression="#[flowVars.data.destination_file != null &amp;&amp; flowVars.data.destination_file.endsWith ('_inuits.zip')]">
-                <dw:transform-message doc:name="Transform Message">
-                    <dw:set-payload>
-                        <![CDATA[%dw 1.0
-%output application/json
----
-{
-	'destination_file': flowVars.pid ++ '.zip',
-	'destination_host': p('ftpDestination.inuits.host'),
-	'destination_password': p('ftpDestination.inuits.password'),
-	'destination_path': p('ftpDestination.inuits.path'),
-	'destination_user': p('ftpDestination.inuits.username'),
-	'source_path': flowVars.request.directory ++ '/_complex',
-	'source_file': flowVars.pid ++ '_inuits.zip',
-	'source_host': p('ftpsource.cegesoma.host'),
-	'source_user': p('ftpsource.cegesoma.username'),
-	'source_password': p('ftpsource.cegesoma.password'),
-	'move': false
-}]]>
-                    </dw:set-payload>
-                </dw:transform-message>
-                <amqp:outbound-endpoint responseTimeout="10000" doc:name="request fxp to inuits folder" exchangeName="${broker.exchanges.hand_off}" connector-ref="handoff_connector"/>
                 <db:update config-ref="tracking-db" doc:name="Database">
                     <db:parameterized-query>
                         <![CDATA[update ${database.tracktable}
@@ -407,7 +371,7 @@ where pid = #[flowVars.pid];]]>
 }]]></dw:set-payload>
         </dw:transform-message>
         <byte-array-to-string-transformer doc:name="Byte Array to String"/>
-        <amqp:outbound-endpoint exchangeName="${broker.exchanges.create_zip}" responseTimeout="10000" connector-ref="broker_connector" doc:name="request zipping into complex file" routingKey="TO_ZIPPER"/>
+        <amqp:outbound-endpoint exchangeName="${broker.exchanges.create_zip}" responseTimeout="10000" connector-ref="broker_connector" doc:name="request zipping into complex file" />
         <db:update config-ref="tracking-db" doc:name="Database">
             <db:parameterized-query>
                 <![CDATA[update ${database.tracktable}
