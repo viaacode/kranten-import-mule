@@ -133,6 +133,7 @@ where pid = #[flowVars.pid];]]>
         </dw:transform-message>
         <logger message="#[payload]" level="INFO" doc:name="Logger"/>
         <dw:transform-message doc:name="split into operations">
+            <dw:input-payload doc:sample="sample_data/list_string.dwl"/>
             <dw:set-variable resource="classpath:split-into-operations.dwl" variableName="data"/>
         </dw:transform-message>
         <logger message="data? #[flowVars.data]" level="INFO" doc:name="Logger"/>
