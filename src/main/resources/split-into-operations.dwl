@@ -1,5 +1,5 @@
 %dw 1.0
-%output application/json
+%output application/java
 ---
 {
 	'tifs': payload filter $.type == 'tif',
