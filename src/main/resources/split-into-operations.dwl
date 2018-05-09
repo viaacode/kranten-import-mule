@@ -10,7 +10,9 @@
     		jp2_creator: {
 				extra_options: '-no_palette',
 				src_path: $.source_path ++ '/' ++ $.source_file,
-             	dest_path: $.destination_path ++ '/' ++ $.destination_file
+             	dest_path: ($.destination_path ++ '/' ++ $.destination_file) replace 'tif' with 'jp2',
+             	result_vhost: '/kranten',
+             	result_queue: 'jp2_responses'
 			}
 		}
 	}),

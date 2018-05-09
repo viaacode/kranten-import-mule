@@ -50,7 +50,7 @@ return payload.get (0).get ('data');
 		<set-variable variableName="pid" value="#[payload['pid'] == null ? payload['correlation_id'] : payload['pid'] ]" doc:name="keep pid"/>
 		<set-variable variableName="data" value="#[payload]" doc:name="keep payload data"/>
         <message-filter throwOnUnaccepted="true" doc:name="Message">
-            <expression-filter expression="#[(payload.success != null &amp;&amp; payload.success == true) &amp;&amp; (payload.status == &quot;OK&quot; || payload.outcome == &quot;OK&quot;)]"/>
+            <expression-filter expression="#[(payload.success != null &amp;&amp; payload.success == true) || (payload.status == &quot;OK&quot; || payload.outcome == &quot;OK&quot;)]"/>
         </message-filter>
 		<db:select config-ref="tracking-db" doc:name="Database">
             <db:parameterized-query><![CDATA[select data from ${database.tracktable} where pid = #[flowVars.pid];]]></db:parameterized-query>
