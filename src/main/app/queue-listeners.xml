@@ -133,6 +133,7 @@ where pid = #[flowVars.pid];]]>
         </dw:transform-message>
         <logger message="#[payload]" level="INFO" doc:name="Logger"/>
         <dw:transform-message doc:name="split into operations">
+            <dw:input-payload doc:sample="sample_data/list_string.dwl"/>
             <dw:set-variable resource="classpath:split-into-operations.dwl" variableName="data"/>
         </dw:transform-message>
         <logger message="data? #[flowVars.data]" level="INFO" doc:name="Logger"/>
@@ -171,7 +172,7 @@ where pid = #[flowVars.pid];]]></db:parameterized-query>
                             <dw:transform-message doc:name="Transform Message">
                                 <dw:set-payload resource="classpath:structures-extract-oriignal.dwl"/>
                             </dw:transform-message>
-                            <amqp:outbound-endpoint exchangeName="${broker.exchanges.create_zip}" responseTimeout="10000" connector-ref="broker_connector" doc:name="ask original zip"/>
+                            <amqp:outbound-endpoint exchangeName="${broker.queues.create_zip}" responseTimeout="10000" connector-ref="broker_connector" doc:name="ask original zip"/>
                         </when>
                         <otherwise>
                             <logger message="Original zip doesn't have to be created" level="INFO" doc:name="Logger"/>
@@ -188,7 +189,7 @@ flowVars.data.jp2s]]>
                         </dw:transform-message>
                         <foreach doc:name="request jp2 creation">
                             <json:object-to-json-transformer doc:name="Object to JSON"/>
-                            <amqp:outbound-endpoint exchangeName="${broker.exchanges.create_jp2}" responseTimeout="10000" connector-ref="broker_connector" doc:name="broker.exchanges.copy_file"/>
+                            <amqp:outbound-endpoint  responseTimeout="10000" connector-ref="handoff_connector" doc:name="broker.exchanges.copy_file" queueName="${broker.queues.create_jp2}"/>
                         </foreach>
                     </processor-chain>
                     <processor-chain>
@@ -288,7 +289,7 @@ where pid = #[flowVars.pid];]]>
                     </db:parameterized-query>
                 </db:update>
             </when>
-            <when expression="#[flowVars.data.destination_file != null &amp;&amp; flowVars.data.destination_file.endsWith ('.complex')]">
+            <when expression="#[flowVars.data.dest_path != null &amp;&amp; flowVars.data.dest_path.endsWith ('.complex')]">
                 <dw:transform-message doc:name="Transform Message">
                     <dw:set-payload>
                         <![CDATA[%dw 1.0
@@ -364,17 +365,19 @@ where pid = #[flowVars.pid];]]>
 ---
 {
 	'correlation_id': flowVars.pid,
-	'pid': flowVars.pid,
-	'source_server': '',
-	'destination_server': '',
-	'source_path': flowVars.request.directory ++ '/' ++ p('private_dir'),
-	'destination_path': flowVars.request.directory ++ '/' ++ p('private_dir'),
-	'destination_file': flowVars.pid ++ '.complex',
-	'excludes': [ '.complex', '.nfs', flowVars.pid ++ '_inuits.zip']
+	service: {
+		zipper: {
+			"src_path": flowVars.request.directory ++ '/' ++ p('private_dir'),
+            "dest_path": flowVars.request.directory ++ '/' ++ p('private_dir') ++ '/' ++ flowVars.pid ++ '.complex',
+            "excludes": [ '.complex', '.nfs', flowVars.pid ++ '_inuits.zip'],
+            "result_vhost": '/kranten',
+            "result_queue": 'kranten_file_complete'
+		}
+	}
 }]]></dw:set-payload>
         </dw:transform-message>
         <byte-array-to-string-transformer doc:name="Byte Array to String"/>
-        <amqp:outbound-endpoint exchangeName="${broker.exchanges.create_zip}" responseTimeout="10000" connector-ref="broker_connector" doc:name="request zipping into complex file" />
+        <amqp:outbound-endpoint  responseTimeout="10000" connector-ref="handoff_connector" doc:name="request zipping into complex file" queueName="${broker.queues.create_zip}"/>
         <db:update config-ref="tracking-db" doc:name="Database">
             <db:parameterized-query>
                 <![CDATA[update ${database.tracktable}
