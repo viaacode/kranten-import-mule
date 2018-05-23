@@ -290,6 +290,7 @@ where pid = #[flowVars.pid];]]>
                 </db:update>
             </when>
             <when expression="#[flowVars.data.dest_path != null &amp;&amp; flowVars.data.dest_path.endsWith ('.complex')]">
+                <flow-ref name="while_amount_in_progress_free" doc:name="while_amount_in_progress_free"/>
                 <dw:transform-message doc:name="Transform Message">
                     <dw:set-payload>
                         <![CDATA[%dw 1.0
@@ -313,7 +314,6 @@ where pid = #[flowVars.pid];]]>
                 <byte-array-to-string-transformer doc:name="Byte Array to String"/>
                 
                 <amqp:outbound-endpoint responseTimeout="10000" doc:name="request hand off to mam system" exchangeName="${broker.exchanges.hand_off}" connector-ref="handoff_connector"/>
-                <flow-ref name="while_amount_in_progress_free" doc:name="while_amount_in_progress_free"/>
                 
                 <db:update config-ref="tracking-db" doc:name="Database">
                     <db:parameterized-query>
