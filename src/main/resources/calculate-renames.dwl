@@ -1,12 +1,10 @@
 %dw 1.0
 %output application/java
-%var getPageNumber = (path) -> (path match /(.*[^0-9])?(\d+).*/)[2]
-%var getExtension = (path) -> (path match /.*\.(.*)/)[1]
-%var filename = (path) -> (path match /(.*\/)?([^\/]*)/)[2]
-%var basepath = (path) -> '' when not (path contains '/') otherwise (path match /(.*)\/[^\/]*/)[1]
-%var destinationPath = (original, type) -> flowVars.request.directory ++ '/_complex/' ++ type
-%var destinationName = (original, type, ext) -> flowVars.pid ++ '_' ++ getPageNumber(original) ++ '_' ++ type ++ '.' ++ ext
-%var destinationNameMets = (original, type, ext) -> flowVars.pid ++ '_' ++ type ++ '.' ++ ext
+%var fileFunctions = readUrl('classpath://file-functions.dwl')
+%function destinationNameMets(original, type, ext, pid) (pid ++ '_' ++ type ++ '.' ++ ext)
+%function filename(path) (path match /(.*\/)?([^\/]*)/)[2]
+%function destinationPath(original, type, dir) (dir ++ '/_complex/' ++ type)
+
 ---
 flowVars.data.files map using
 (type = 'tif' when (lower $ contains 'tif') 
@@ -22,9 +20,9 @@ flowVars.data.files map using
 	'source_server': flowVars.request.host when flowVars.request.host != null otherwise p('hosted_at'),
 	('username': flowVars.request.username) when flowVars.request.username != null,
 	('password': flowVars.request.password) when flowVars.request.password != null,
-	'destination_path': destinationPath($, type) when type != 'original_mets' otherwise destinationPath($, 'mets'),
-	'destination_file': destinationName($, type, getExtension($)) when type != 'original_mets' and type != 'pdf' otherwise destinationNameMets($, type, getExtension($)),
-	'source_path': flowVars.request.directory ++ '/' ++ basepath($),
+	'destination_path': destinationPath($, type, flowVars.request.directory) when type != 'original_mets' otherwise destinationPath($, 'mets', flowVars.request.directory),
+	'destination_file': fileFunctions.destinationName($, type, fileFunctions.getExtension($), flowVars.pid) when type != 'original_mets' and type != 'pdf' otherwise fileFunctions.destinationNameMets($, type, fileFunctions.getExtension($), flowVars.pid),
+	'source_path': flowVars.request.directory ++ '/' ++ fileFunctions.basepath($),
 	'source_file': filename($),
 	'type': type,
 	original: $
