@@ -263,10 +263,12 @@ where pid = #[flowVars.pid]]]></db:parameterized-query>
         <choice doc:name="is pid structure complete?">
             <when expression="#[payload[0].completed]">
                 <dw:transform-message doc:name="Transform Message" metadata:id="375b976c-675c-4603-9413-b5c0f3096c66">
-                    <dw:input-variable doc:sample="sample_data/json_1.json" variableName="metadata"/>
+                    <dw:input-variable doc:sample="sample_data/fVars_request.dwl" variableName="request"/>
+                    <dw:input-variable doc:sample="sample_data/fVars_pid.dwl" variableName="pid"/>
                     <dw:set-payload>
                         <![CDATA[%dw 1.0
 %output application/json
+%var fileFunctions = readUrl("classpath://file-functions.dwl")
 ---
 {
 	'correlation_id': flowVars.pid,
@@ -275,6 +277,10 @@ where pid = #[flowVars.pid]]]></db:parameterized-query>
 	'metadata': flowVars.request.metadata,
 	'agents': flowVars.request.agents,
 	'fileUse': flowVars.request.fileUse,
+	'checksums': flowVars.request.checksums mapObject using (filename = fileFunctions.destinationName($$, fileFunctions.getType($$), fileFunctions.getExtension($$), flowVars.pid))
+	{
+		'$filename': $
+	},
 	'excludes': [ '.complex', '.nfs']
 }]]>
                     </dw:set-payload>
@@ -312,9 +318,7 @@ where pid = #[flowVars.pid];]]>
                     </dw:set-payload>
                 </dw:transform-message>
                 <byte-array-to-string-transformer doc:name="Byte Array to String"/>
-                
                 <amqp:outbound-endpoint responseTimeout="10000" doc:name="request hand off to mam system" exchangeName="${broker.exchanges.hand_off}" connector-ref="handoff_connector"/>
-                
                 <db:update config-ref="tracking-db" doc:name="Database">
                     <db:parameterized-query>
                         <![CDATA[update ${database.tracktable}
