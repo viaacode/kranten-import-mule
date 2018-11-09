@@ -31,14 +31,14 @@ http://www.mulesoft.org/schema/mule/xml http://www.mulesoft.org/schema/mule/xml/
         <set-variable variableName="id" value="#[payload['id']]" doc:name="Set id"/>
         <set-variable variableName="request" value="#[payload]" doc:name="keep request"/>
         <db:select config-ref="tracking-db" doc:name="Get potentially existing row from database">
-            <db:parameterized-query><![CDATA[SELECT * FROM tracktable WHERE gazet_fk = #[flowVars.id] or pid = #[flowVars.id];]]></db:parameterized-query>
+            <db:parameterized-query><![CDATA[SELECT * FROM tracktable WHERE pid = #[flowVars.pid];]]></db:parameterized-query>
         </db:select>
         <choice doc:name="Update existing or insert new?">
             <when expression="#[payload.size() &gt; 0]">
                 <db:update config-ref="tracking-db" doc:name="Update existing">
                     <db:parameterized-query><![CDATA[UPDATE tracktable 
-SET pid = #[flowVars.pid], status = 'initialized', data = #[flowVars.json], nr_of_moves = 0, nr_of_moved = 0
-WHERE gazet_fk = #[flowVars.id];]]></db:parameterized-query>
+SET gazet_fk = #[flowVars.id], status = 'initialized', data = #[flowVars.json], nr_of_moves = 0, nr_of_moved = 0
+WHERE pid = #[flowVars.pid];]]></db:parameterized-query>
                 </db:update>
             </when>
             <otherwise>
