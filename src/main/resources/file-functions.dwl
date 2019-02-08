@@ -1,9 +1,10 @@
 %dw 1.0
 %output application/java
 %function getPageNumber(path) (path match /(.*[^0-9])?(\d+).*/)[2]
+%function getDynamicPageNumber(path, regex, index) extractRegexGroup(data, regex, index) //(path match regex)[index]
 %function getExtension(path) (path match /.*\.(.*)/)[1]
 %function basepath(path) '' when not (path contains '/') otherwise (path match /(.*)\/[^\/]*/)[1]
-%function destinationName(original, type, ext, pid) pid ++ '_' ++ getPageNumber(original) ++ '_' ++ type ++ '.' ++ ext
+%function destinationName(original, type, ext, pid, pagenumberregex, index) (pid ++ '_' ++ getDynamicPageNumber(original, pagenumberregex, index) ++ '_' ++ type ++ '.' ++ ext) when (pagenumberregex != null and index != null) otherwise (pid ++ '_' ++ getPageNumber(original) ++ '_' ++ type ++ '.' ++ ext)
 %function destinationNameMets(original, type, ext, pid) pid ++ '_' ++ type ++ '.' ++ ext
 %function getType(filename) 'tif' when (lower filename contains 'tif') 
 			otherwise (('alto') when (lower filename contains 'alto') 

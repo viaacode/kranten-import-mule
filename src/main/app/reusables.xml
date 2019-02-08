@@ -19,6 +19,20 @@ http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/jso
 http://www.mulesoft.org/schema/mule/scripting http://www.mulesoft.org/schema/mule/scripting/current/mule-scripting.xsd
 http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
 http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+	<configuration>
+		<expression-language>
+			<global-functions>
+				def extractRegexGroup(data, regex, group) {
+					java.util.regex.Matcher matcher = java.util.regex.Pattern.compile(regex).matcher(data);
+					if (matcher.find()) {
+						return matcher.group(group);
+					}
+					return null;
+				}
+			</global-functions>
+		</expression-language>
+	</configuration>
+
 <!-- 
 	<flow name="setup-related-info" initialState="started" processingStrategy="synchronous">
 		<json:json-to-object-transformer returnClass="java.util.HashMap" doc:name="JSON to Object"/>
