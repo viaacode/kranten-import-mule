@@ -53,3 +53,10 @@ ftpsource.cegesoma.password=
 
 private_dir=
 hosted_at=
+
+sensor.host=
+sensor.path=
+sensor.id=
+sensor.username=
+sensor.password=
+sensor.maxinprogress=

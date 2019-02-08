@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<mule xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking"
+<mule xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking"
 	xmlns="http://www.mulesoft.org/schema/mule/core"
 	xmlns:amqp="http://www.mulesoft.org/schema/mule/amqp"
 	xmlns:db="http://www.mulesoft.org/schema/mule/db"
@@ -47,15 +47,11 @@ return payload.get (0).get ('data');
 	-->
 	<sub-flow name="setup-related-info">
 				<json:json-to-object-transformer returnClass="java.util.HashMap" doc:name="JSON to Object"/>
-		<set-variable variableName="pid" value="#[payload['correlation_id'] == null ? payload['pid'] : payload['correlation_id'] ]" doc:name="keep pid"/>
+		<set-variable variableName="pid" value="#[payload['pid'] == null ? payload['correlation_id'] : payload['pid'] ]" doc:name="keep pid"/>
 		<set-variable variableName="data" value="#[payload]" doc:name="keep payload data"/>
-		<scripting:component doc:name="Groovy">
-			<scripting:script engine="Groovy"><![CDATA[import be.viaa.exceptions.StepFailedException;
-
-boolean isError = (payload.status != null && ! "ok".equalsIgnoreCase (payload.status)) || (payload.status != null && ! payload.status);
-
-if ( isError ) { throw new StepFailedException ('previous step was not successfull'); }]]></scripting:script>
-		</scripting:component>
+        <message-filter throwOnUnaccepted="true" doc:name="Message">
+            <expression-filter expression="#[(payload.success != null &amp;&amp; payload.success == true) || (payload.status == &quot;OK&quot; || payload.outcome == &quot;OK&quot;)]"/>
+        </message-filter>
 		<db:select config-ref="tracking-db" doc:name="Database">
             <db:parameterized-query><![CDATA[select data from ${database.tracktable} where pid = #[flowVars.pid];]]></db:parameterized-query>
 		</db:select>
@@ -67,7 +63,7 @@ return payload.get (0).get ('data');
 ]]></scripting:script>
 		</scripting:component>
         <json:json-to-object-transformer returnClass="java.util.HashMap" doc:name="JSON to Object"/>
-		<set-variable variableName="request" value="#[payload]" doc:name="keep pid related data"/>
+		<set-variable variableName="request" value="#[payload]" doc:name="keep pid related data (Set request)"/>
 	</sub-flow>
 
 	<sub-flow name="log">
@@ -97,7 +93,7 @@ return payload.get (0).get ('data');
         <choice doc:name="Choice">
             <when expression="#[flowVars.pid != null]">
                 <choice doc:name="Is TIFF corrupt?">
-                    <when expression="#[flowVars.data.details.contains(&quot;Cannot read TIFF header&quot;) || flowVars.data.details.contains(&quot;Not enough data at scanline&quot;) || flowVars.data.details.contains(&quot;Sanity check on directory count failed&quot;)  || flowVars.data.details.contains(&quot;Not enough data for scanline&quot;)]">
+                    <when expression="#[flowVars.?data.?details != null &amp;&amp; (flowVars.data.details.contains(&quot;Cannot read TIFF header&quot;) || flowVars.data.details.contains(&quot;Not enough data at scanline&quot;) || flowVars.data.details.contains(&quot;Sanity check on directory count failed&quot;)  || flowVars.data.details.contains(&quot;Not enough data for scanline&quot;))]">
                         <db:update config-ref="tracking-db" doc:name="Database">
                             <db:parameterized-query><![CDATA[UPDATE tracktable SET status = 'corrupted' WHERE pid = #[flowVars.pid];]]></db:parameterized-query>
                         </db:update>

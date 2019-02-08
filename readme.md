@@ -17,7 +17,7 @@ CREATE TABLE tracktable (
 	nr_of_moved integer DEFAULT 0
 );
 ```
-###Usage
+## Usage
 Place a message on the ingestrequests queue.
 
 example:

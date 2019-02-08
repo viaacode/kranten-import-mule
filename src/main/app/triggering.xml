@@ -21,13 +21,7 @@ http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/jso
 http://www.mulesoft.org/schema/mule/scripting http://www.mulesoft.org/schema/mule/scripting/current/mule-scripting.xsd
 http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd">
 
-	<http:listener-config name="HTTP_Listener_Configuration" host="0.0.0.0" port="8081" doc:name="HTTP Listener Configuration"/>
 	<http:request-config name="pid-generator" host="${pidservice.host}" port="${pidservice.port}" basePath="/" doc:name="HTTP Request Configuration"/>
-
-	<flow name="triggeringFlow">
-		<http:listener config-ref="HTTP_Listener_Configuration" path="/" allowedMethods="POST" doc:name="HTTP"/>
-        <flow-ref name="initiate_import_flow_cegesoma" doc:name="initiate_import_flow_cegesoma"/>
-	</flow>
     <flow name="triggeringFlow1" initialState="started" processingStrategy="synchronous">
         <amqp:inbound-endpoint queueName="${broker.queues.ingestrequests}" queueDurable="true" responseTimeout="10000" connector-ref="broker_connector" doc:name="Get message from ingestrequests queue"/>
         <flow-ref name="initiate_import_flow_cegesoma" doc:name="initiate_import_flow_cegesoma"/>
@@ -35,17 +29,14 @@ http://www.springframework.org/schema/beans http://www.springframework.org/schem
     </flow>
     <sub-flow name="initiate_import_flow_cegesoma">
     	<json:json-to-object-transformer returnClass="java.util.HashMap" doc:name="JSON to Object"/>
-		<set-variable variableName="request" value="#[payload]" doc:name="Variable"/>
-        <enricher target="#[payload]" doc:name="Message Enricher">
-            <db:update config-ref="metadata_db" doc:name="mark for processing">
-                <db:parameterized-query><![CDATA[update ${metadatadb.table}
+		<set-variable variableName="request" value="#[payload]" doc:name="Set request with payload"/>
+        <db:update config-ref="metadata_db" doc:name="mark for processing">
+            <db:parameterized-query><![CDATA[update ${metadatadb.table}
 set status = 'in_progress'
 WHERE id = #[flowVars.request.id]]]></db:parameterized-query>
-            </db:update>
-        </enricher>
-        <enricher target="#[payload]" doc:name="Message Enricher">
-            <db:select config-ref="metadata_db" doc:name="select for processing">
-                <db:parameterized-query><![CDATA[SELECT
+        </db:update>
+        <db:select config-ref="metadata_db" doc:name="select for processing">
+            <db:parameterized-query><![CDATA[SELECT
     gazetten.id, gazetten.viaa_pid, gazetten.vol_id, gazetten.tit_id, corrections.vol_cote, gazetten.vol_additional_cote, gazetten.vol_unique_num, corrections.vol_folder_name,
     gazetten.titre, gazetten.opm, gazetten.dag, gazetten.instelling, gazetten.dagen, gazetten.plaatsingsnummer, gazetten.fz, gazetten.datum,
     gazetten.datum_clean, gazetten.dor, gazetten.jaar, gazetten.maand, gazetten.annex, gazetten.oorlog, gazetten.nr_guide, gazetten.gevonden, gazetten.verschenen,
@@ -61,8 +52,7 @@ AND
 WHERE corrections.vol_cote IS NOT NULL AND corrections.vol_folder_name IS NOT NULL
 AND gazetten.id = #[flowVars.request.id]
 LIMIT 1;]]></db:parameterized-query>
-            </db:select>
-        </enricher>
+        </db:select>
         <foreach doc:name="For Each">
             <set-variable variableName="row" value="#[payload]" doc:name="keep db entry"/>
             <choice doc:name="Do we need to generate a pid?">
@@ -85,7 +75,7 @@ payload.instelling]]></dw:set-variable>
             </dw:transform-message>
             <json:object-to-json-transformer doc:name="Object to JSON"/>
             <enricher source="payload" target="flowVars.ignored" doc:name="Message Enricher">
-                <amqp:outbound-endpoint queueName="${broker.queues.trigger}" responseTimeout="10000" connector-ref="broker_connector" doc:name="broker.queues.trigger"/>
+                <amqp:outbound-endpoint queueName="${broker.queues.trigger}" responseTimeout="10000" connector-ref="broker_connector" doc:name="broker.queues.trigger (kranten_initialize)"/>
             </enricher>
             <json:json-to-object-transformer returnClass="java.util.HashMap" doc:name="JSON to Object"/>
             <enricher source="payload" target="flowVars.updated" doc:name="Message Enricher">
