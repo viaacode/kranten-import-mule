@@ -42,3 +42,6 @@ example:
 ```
 
 The `_complex` directory will then be removed, and the generation starts from scratch.
+
+# Sequence diagram
+![Alt](resources/sequence_diagram.svg)
