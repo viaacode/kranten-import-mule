@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<mule xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:mulexml="http://www.mulesoft.org/schema/mule/xml" xmlns="http://www.mulesoft.org/schema/mule/core" 
+<mule xmlns:validation="http://www.mulesoft.org/schema/mule/validation"
+	xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:mulexml="http://www.mulesoft.org/schema/mule/xml" xmlns="http://www.mulesoft.org/schema/mule/core" 
     xmlns:amqp="http://www.mulesoft.org/schema/mule/amqp" 
     xmlns:db="http://www.mulesoft.org/schema/mule/db" 
     xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" 
@@ -10,7 +11,8 @@
     xmlns:spring="http://www.springframework.org/schema/beans" 
     xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" 
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:schemaLocation="http://www.mulesoft.org/schema/mule/amqp http://www.mulesoft.org/schema/mule/amqp/current/mule-amqp.xsd
+    xsi:schemaLocation="http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd
+http://www.mulesoft.org/schema/mule/amqp http://www.mulesoft.org/schema/mule/amqp/current/mule-amqp.xsd
 http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
 http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
 http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
@@ -277,10 +279,10 @@ where pid = #[flowVars.pid]]]></db:parameterized-query>
 	'metadata': flowVars.request.metadata,
 	'agents': flowVars.request.agents,
 	'fileUse': flowVars.request.fileUse,
-	'checksums': flowVars.request.checksums mapObject using (filename = fileFunctions.destinationName($$, fileFunctions.getType($$), fileFunctions.getExtension($$), flowVars.pid))
+	('checksums': flowVars.request.checksums mapObject using (filename = fileFunctions.destinationName($$, fileFunctions.getType($$), fileFunctions.getExtension($$), flowVars.pid))
 	{
 		'$filename': $
-	},
+	}) when flowVars.request.checksums?,
 	'excludes': [ '.complex', '.nfs']
 }]]>
                     </dw:set-payload>
@@ -296,7 +298,7 @@ where pid = #[flowVars.pid];]]>
                 </db:update>
             </when>
             <when expression="#[flowVars.data.dest_path != null &amp;&amp; flowVars.data.dest_path.endsWith ('.complex')]">
-                <flow-ref name="while_amount_in_progress_free" doc:name="while_amount_in_progress_free"/>
+                <flow-ref name="checkSensors" doc:name="checkSensors"/>
                 <dw:transform-message doc:name="Transform Message">
                     <dw:set-payload>
                         <![CDATA[%dw 1.0
@@ -392,30 +394,27 @@ where pid = #[flowVars.pid];]]>
         <amqp:acknowledge-message doc:name="AMQP-0-9 Acknowledge Message"/>
         <exception-strategy ref="reject-handler" doc:name="Reference Exception Strategy"/>
     </flow>
-    <flow name="while_amount_in_progress_free" processingStrategy="synchronous">
-        <http:request config-ref="Sensor_API_Configuration" path="${sensor.path}" method="GET" doc:name="HTTP sensor">
-            <http:request-builder>
-                <http:query-param paramName="content" value="channels"/>
-                <http:query-param paramName="output" value="xml"/>
-                <http:query-param paramName="columns" value="name,lastvalue_"/>
-                <http:query-param paramName="id" value="${sensor.id}"/>
-                <http:query-param paramName="username" value="${sensor.username}"/>
-                <http:query-param paramName="password" value="${sensor.password}"/>
-            </http:request-builder>
-        </http:request>
-        <until-successful maxRetries="999999999" synchronous="true" doc:name="Until Successful">
-            <flow-ref name="while_amount_in_progress_free_sub" doc:name="while_amount_in_progress_free_sub"/>
+<sub-flow name="checkSensors">
+        <set-payload value="#[dw(&quot;p('sensor.ids') splitBy ','&quot;)]" mimeType="application/java" doc:name="Set Payload to list of sensors"/>
+        <until-successful maxRetries="999999999" millisBetweenRetries="300000" synchronous="true" doc:name="Until Successful">
+            <flow-ref name="loopSensors" doc:name="loopSensors"/>
         </until-successful>
-        <catch-exception-strategy doc:name="Catch Exception Strategy">
-            <logger message="No sensor found. Proceeding" level="WARN" doc:name="Logger"/>
-        </catch-exception-strategy>
-    </flow>
-    <sub-flow name="while_amount_in_progress_free_sub">
-        <logger message="Checking amount in progress" level="INFO" doc:name="Logger"/>
+    </sub-flow>
+    <sub-flow name="loopSensors">
+        <foreach collection="#[payload]" doc:name="For Each">
+            <set-payload value="#[payload]" mimeType="application/java" doc:name="Force mimeType to java"/>
+            <set-variable variableName="sensorId" value="#[payload]" mimeType="application/java" doc:name="Set sensorId"/>
+            <set-variable variableName="maxValue" value="#[dw(&quot;p('sensor.' ++ payload ++ '.maxvalue')&quot;)]" doc:name="Set maxValue"/>
+            <flow-ref name="while_amount_in_progress_free_sub" doc:name="while_amount_in_progress_free_sub"/>
+        </foreach>
+    </sub-flow>
+	
+	<sub-flow name="while_amount_in_progress_free_sub">
+        <logger message="Checking sensor with id: #[flowVars.sensorId]" level="INFO" doc:name="Logger"/>
         <http:request config-ref="Sensor_API_Configuration" path="${sensor.path}" method="GET" doc:name="HTTP sensor">
             <http:request-builder>
                 <http:query-param paramName="output" value="xml"/>
-                <http:query-param paramName="id" value="${sensor.id}"/>
+                <http:query-param paramName="id" value="#[flowVars.sensorId]"/>
                 <http:query-param paramName="username" value="${sensor.username}"/>
                 <http:query-param paramName="password" value="${sensor.password}"/>
                 <http:query-param paramName="content" value="channels"/>
@@ -423,10 +422,8 @@ where pid = #[flowVars.pid];]]>
             </http:request-builder>
         </http:request>
         <mulexml:dom-to-xml-transformer doc:name="DOM to XML"/>
-        <set-variable variableName="in_progress" value="#[java.lang.Integer.parseInt(xpath3(&quot;//channels/item[name='Value']/lastvalue/text()&quot;).split(' #')[0].replaceAll(' ',''))]" doc:name="Set in_progress"/>
-        <logger message="#[&quot;Amount in progress: &quot; + flowVars.in_progress]" level="INFO" doc:name="Logger"/>
-        <message-filter throwOnUnaccepted="true" doc:name="Message">
-            <expression-filter expression="#[flowVars.in_progress &lt; '${sensor.maxinprogress}']"/>
-        </message-filter>
+        <set-variable variableName="value" value="#[java.lang.Integer.parseInt(xpath3(&quot;//channels/item[name='Value']/lastvalue/text()&quot;).split(' #')[0].replaceAll(' ',''))]" doc:name="Set value"/>
+        <logger message="Value for sensor #[flowVars.sensorId]: #[flowVars.value] / #[flowVars.maxValue]" level="INFO" doc:name="Logger"/>
+        <validation:is-false message="Sensor #[flowVars.sensorId] has a value (#[flowVars.value]) greater than the maximum allowed (#[flowVars.maxValue])" exceptionClass="java.lang.IllegalArgumentException" expression="#[flowVars.value &gt; flowVars.maxValue]" doc:name="Validation"/>
     </sub-flow>
 </mule>
