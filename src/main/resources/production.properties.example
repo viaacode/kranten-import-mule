@@ -71,7 +71,8 @@ hosted_at=
 
 sensor.host=
 sensor.path=
-sensor.id=
 sensor.username=
 sensor.password=
-sensor.maxinprogress=
+sensor.ids=22348,23029
+sensor.22348.maxvalue=6000
+sensor.23029.maxvalue=100
