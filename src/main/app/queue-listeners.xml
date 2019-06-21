@@ -396,13 +396,16 @@ where pid = #[flowVars.pid];]]>
     </flow>
 <sub-flow name="checkSensors">
         <set-payload value="#[dw(&quot;p('sensor.ids') splitBy ','&quot;)]" mimeType="application/java" doc:name="Set Payload to list of sensors"/>
+        <until-successful maxRetries="999999999" millisBetweenRetries="300000" synchronous="true" doc:name="Until Successful">
+            <flow-ref name="loopSensors" doc:name="loopSensors"/>
+        </until-successful>
+    </sub-flow>
+    <sub-flow name="loopSensors">
         <foreach collection="#[payload]" doc:name="For Each">
             <set-payload value="#[payload]" mimeType="application/java" doc:name="Force mimeType to java"/>
             <set-variable variableName="sensorId" value="#[payload]" mimeType="application/java" doc:name="Set sensorId"/>
             <set-variable variableName="maxValue" value="#[dw(&quot;p('sensor.' ++ payload ++ '.maxvalue')&quot;)]" doc:name="Set maxValue"/>
-            <until-successful maxRetries="999999999" millisBetweenRetries="300000" synchronous="true" doc:name="Until Successful">
-                <flow-ref name="while_amount_in_progress_free_sub" doc:name="while_amount_in_progress_free_sub"/>
-            </until-successful>
+            <flow-ref name="while_amount_in_progress_free_sub" doc:name="while_amount_in_progress_free_sub"/>
         </foreach>
     </sub-flow>
 	
