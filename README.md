@@ -43,5 +43,16 @@ example:
 
 The `_complex` directory will then be removed, and the generation starts from scratch.
 
+## Sensor checks
+The application checks the sensors defined in the `sensor.ids` property in order. For every sensor that exists in this list, there needs to be a maximum value defined.
+Example:
+```
+sensor.ids=22348,23029
+sensor.22348.maxvalue=20
+sensor.23029.maxvalue=50
+```
+
+Before delivering a .complex file, all sensors are checked and compared with their maximum value. If the maximum value is exceeded, the code polls checks these sensors every 5 minutes and does not deliver the file as long as the sensor values exceed their maximums.
+
 # Sequence diagram
 ![Alt](resources/sequence_diagram.svg)
