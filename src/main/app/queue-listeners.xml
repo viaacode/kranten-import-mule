@@ -116,7 +116,7 @@ where pid = #[flowVars.pid];]]>
 	'correlation_id': flowVars.pid,
 	'pid': flowVars.pid,
 	'directory': flowVars.request.directory,
-	'excludes': ['_complex', '.nfs', '_uncompressed.tif', 'Thumbs.db']
+	'excludes': ['_complex', '.nfs', '_uncompressed.tif', 'Thumbs.db', 'abbyy']
 }]]>
             </dw:set-payload>
         </dw:transform-message>
