@@ -7,15 +7,6 @@
             <SizeBasedTriggeringPolicy size="10 MB" />
             <DefaultRolloverStrategy max="10"/>
         </RollingFile>
-        <Socket name="logstash" host="do-qas-lst-v2.do.viaa.be" port="7000">
-            <SerializedLayout />
-        </Socket>
-        <Rewrite name="rewrite">
-	      <AppenderRef ref="logstash"/>
-	      <PropertiesRewritePolicy>
-	        <Property name="application">kranten-import-mule</Property>
-	      </PropertiesRewritePolicy>
-	    </Rewrite>
     </Appenders>
     <Loggers>
         <!-- CXF is used heavily by Mule for web services -->
@@ -37,7 +28,6 @@
         
         <AsyncRoot level="INFO">
             <AppenderRef ref="file" />
-             <AppenderRef ref="rewrite" />
         </AsyncRoot>
     </Loggers>
 </Configuration>
