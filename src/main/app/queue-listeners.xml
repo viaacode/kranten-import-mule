@@ -279,10 +279,10 @@ where pid = #[flowVars.pid]]]></db:parameterized-query>
 	'metadata': flowVars.request.metadata,
 	'agents': flowVars.request.agents,
 	'fileUse': flowVars.request.fileUse,
-	('checksums': flowVars.request.checksums mapObject using (filename = fileFunctions.destinationName($$, fileFunctions.getType($$), fileFunctions.getExtension($$), flowVars.pid))
+	'checksums': flowVars.request.checksums mapObject using (filename = fileFunctions.destinationName($$, fileFunctions.getType($$), fileFunctions.getExtension($$), flowVars.pid))
 	{
 		'$filename': $
-	}) when flowVars.request.checksums?,
+	} when flowVars.request.checksums? otherwise {},
 	'excludes': [ '.complex', '.nfs']
 }]]>
                     </dw:set-payload>
